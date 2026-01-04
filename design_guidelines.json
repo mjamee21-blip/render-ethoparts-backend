@@ -1,0 +1,136 @@
+{
+  "project_name": "Etho Parts",
+  "design_philosophy": {
+    "theme_name": "Addis Industrial",
+    "core_concept": "Fusion of rugged automotive reliability with the vibrant cultural heritage of Ethiopia. A 'Dark Mode' first aesthetic that feels premium, technical, and trusted.",
+    "emotional_tone": "Reliable, Modern, Fast, culturally rooted.",
+    "visual_style": "Bento-grid layouts, high-contrast typography, glassmorphism overlays, and subtle Ethiopian pattern accents."
+  },
+  "typography": {
+    "font_family_heading": "Chivo, sans-serif",
+    "font_family_body": "Manrope, sans-serif",
+    "font_weights": {
+      "heading": "900",
+      "subheading": "700",
+      "body": "400",
+      "bold": "600"
+    },
+    "scale": {
+      "h1": "text-5xl md:text-7xl tracking-tighter",
+      "h2": "text-3xl md:text-5xl tracking-tight",
+      "h3": "text-2xl md:text-3xl",
+      "body": "text-base md:text-lg leading-relaxed",
+      "caption": "text-sm tracking-widest uppercase"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "name": "Addis Asphalt",
+        "hex": "#0f172a",
+        "tailwind": "bg-slate-900"
+      },
+      "secondary": {
+        "name": "Mechanic Grey",
+        "hex": "#334155",
+        "tailwind": "bg-slate-700"
+      },
+      "accent_green": {
+        "name": "Ethiopian Emerald",
+        "hex": "#10B981",
+        "usage": "Primary CTA, Success, In Stock",
+        "tailwind": "text-emerald-500 bg-emerald-500"
+      },
+      "accent_yellow": {
+        "name": "Addis Sun",
+        "hex": "#F59E0B",
+        "usage": "Highlights, Sale, Warnings",
+        "tailwind": "text-amber-500 bg-amber-500"
+      },
+      "accent_red": {
+        "name": "Bole Red",
+        "hex": "#EF4444",
+        "usage": "Urgency, Errors, Hot Deals",
+        "tailwind": "text-red-500 bg-red-500"
+      },
+      "background": {
+        "default": "#020617",
+        "paper": "#0f172a"
+      },
+      "text": {
+        "primary": "#f8fafc",
+        "secondary": "#94a3b8"
+      }
+    },
+    "gradients": {
+      "hero": "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900",
+      "ethio_flag_strip": "bg-gradient-to-r from-emerald-500 via-amber-500 to-red-500"
+    }
+  },
+  "layout_system": {
+    "grid_strategy": "Bento Grid (Asymmetric)",
+    "spacing": "Generous (p-8 to p-24)",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "modes": {
+      "marketing": "Tetris Grid (Mixed spans)",
+      "dashboard": "Control Room Grid (Dense, Data-heavy)"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-sm shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all hover:scale-105",
+      "secondary": "bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 font-medium py-3 px-6 rounded-sm",
+      "ghost": "text-slate-400 hover:text-white hover:bg-white/5"
+    },
+    "cards": {
+      "product": "group relative bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-colors overflow-hidden rounded-lg",
+      "feature": "bg-slate-900/50 backdrop-blur-md border border-white/10 p-8 rounded-xl"
+    },
+    "inputs": {
+      "style": "bg-slate-950 border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-md h-12 text-white placeholder:text-slate-500"
+    }
+  },
+  "visual_assets": {
+    "images": [
+      {
+        "category": "hero_bg",
+        "url": "https://images.unsplash.com/photo-1483671174579-bab2a5293389?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwzfHxldGhpb3BpYW4lMjBsYW5kc2NhcGUlMjBtb3VudGFpbnN8ZW58MHx8fHwxNzY3NDk2OTc0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Ethiopian mountain road - represents the journey and terrain."
+      },
+      {
+        "category": "city_context",
+        "url": "https://images.unsplash.com/photo-1604560842632-bd795d8f1275?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxBZGRpcyUyMEFiYWJhJTIwc2t5bGluZSUyMG1vZGVybnxlbnwwfHx8fDE3Njc0OTY5NzF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Addis Ababa Skyline - establishes location."
+      },
+      {
+        "category": "product_hero",
+        "url": "https://images.unsplash.com/photo-1640556795357-71d4078d6228?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjYXIlMjBlbmdpbmUlMjBwYXJ0cyUyMGFydGlzdGljfGVufDB8fHx8MTc2NzQ5Njk3Mnww&ixlib=rb-4.1.0&q=85",
+        "description": "Artistic Car Engine - represents the core product."
+      },
+      {
+        "category": "service",
+        "url": "https://images.unsplash.com/photo-1577801347179-8356c29eb6fd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxtZWNoYW5pYyUyMHdvcmtpbmclMjBvbiUyMGNhciUyMG1vZGVybiUyMHdvcmtzaG9wfGVufDB8fHx8MTc2NzQ5Njk3NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Mechanic working - represents service and expertise."
+      }
+    ],
+    "icons": "Lucide React (default) or Phosphor Icons for a more technical look."
+  },
+  "motion_guidelines": {
+    "library": "Framer Motion",
+    "transitions": {
+      "page_load": "opacity: 0, y: 20 -> opacity: 1, y: 0 (duration: 0.6s)",
+      "hover": "scale: 1.02, brightness: 1.1 (duration: 0.2s)",
+      "list_stagger": "staggerChildren: 0.1"
+    }
+  },
+  "universal_guidelines": [
+    "Do not use gradients for dark colors.",
+    "Avoid generic centered layouts; use asymmetry.",
+    "Use glassmorphism with backdrop-blur-xl for sticky headers.",
+    "Ensure all interactive elements have data-testid attributes.",
+    "Use 'sonner' for toast notifications.",
+    "Prioritize Shadcn UI components but customize them to match the 'Addis Industrial' theme.",
+    "Never use transparent backgrounds on headers without a blur/scrim."
+  ],
+  "instructions_to_main_agent": "Implement the 'One Page' feel by using a sticky navigation bar that smooth-scrolls to sections (Hero, Featured, Categories, About). Use a 'Sheet' or 'Dialog' for the Cart and Login to avoid leaving the main experience. Dashboards should be separate routes but share the same visual DNA."
+}
