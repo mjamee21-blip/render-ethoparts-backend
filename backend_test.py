@@ -160,6 +160,13 @@ class EthoPartsAPITester:
             self.log_test("Create Order", False, "Missing buyer token or products")
             return False
 
+        # Get seller payment methods for the first product
+        seller_id = self.products[0]['seller_id']
+        success, payment_methods, status = self.make_request('GET', f'seller/{seller_id}/payment-methods')
+        if not success or not payment_methods:
+            self.log_test("Create Order", False, f"No payment methods available for seller")
+            return False
+
         order_data = {
             "items": [
                 {
@@ -170,7 +177,7 @@ class EthoPartsAPITester:
             "shipping_address": "123 Test Street, Addis Ababa",
             "shipping_city": "Addis Ababa",
             "shipping_phone": "0912345678",
-            "payment_method": "telebirr",
+            "payment_method_id": payment_methods[0]['id'],  # Use seller payment method ID
             "notes": "Test order"
         }
         success, data, status = self.make_request('POST', 'orders', order_data, self.buyer_token, 200)
