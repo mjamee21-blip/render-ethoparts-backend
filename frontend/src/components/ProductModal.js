@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { Star, ShoppingCart, Truck, Shield, Minus, Plus, X } from "lucide-react";
+import { Star, ShoppingBag, Truck, Shield, Minus, Plus, Check, Zap } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { toast } from "sonner";
 import axios from "axios";
@@ -37,21 +36,21 @@ export default function ProductModal({ product, onClose }) {
       return;
     }
     addItem(product, quantity);
-    toast.success(`${quantity} x ${product.name} added to cart`);
+    toast.success("Added to cart");
     onClose();
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-slate-800 max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="product-modal">
+      <DialogContent className="bg-[#111113] border-white/[0.06] max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl" data-testid="product-modal">
         <DialogHeader>
           <DialogTitle className="sr-only">{product.name}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Images */}
-          <div className="space-y-4">
-            <div className="aspect-square rounded-xl overflow-hidden bg-slate-800">
+        <div className="grid md:grid-cols-2 gap-8 p-2">
+          {/* Images - Clean */}
+          <div className="space-y-3">
+            <div className="aspect-square rounded-xl overflow-hidden bg-white/[0.02]">
               {product.images?.[selectedImage] ? (
                 <img
                   src={product.images[selectedImage]}
@@ -59,7 +58,7 @@ export default function ProductModal({ product, onClose }) {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                <div className="w-full h-full flex items-center justify-center text-zinc-600">
                   No Image
                 </div>
               )}
@@ -70,8 +69,8 @@ export default function ProductModal({ product, onClose }) {
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${
-                      selectedImage === idx ? "border-emerald-500" : "border-transparent"
+                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedImage === idx ? "border-emerald-500" : "border-transparent opacity-60 hover:opacity-100"
                     }`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
@@ -81,53 +80,54 @@ export default function ProductModal({ product, onClose }) {
             )}
           </div>
 
-          {/* Details */}
+          {/* Details - Minimal */}
           <div className="space-y-6">
+            {/* Header */}
             <div>
-              <div className="flex items-start justify-between">
-                <div>
-                  <Badge className={`${
-                    product.condition === "new" ? "bg-emerald-500" :
-                    product.condition === "used" ? "bg-amber-500" : "bg-blue-500"
-                  } text-white capitalize mb-2`}>
-                    {product.condition}
-                  </Badge>
-                  <h2 className="text-2xl font-bold text-white">{product.name}</h2>
-                  <p className="text-slate-400 mt-1">{product.brand}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center mt-4 space-x-4">
-                <div className="flex items-center text-amber-400">
-                  <Star className="h-5 w-5 fill-current" />
-                  <span className="ml-1 font-medium">{product.avg_rating || 0}</span>
-                  <span className="text-slate-500 ml-1">({product.review_count} reviews)</span>
-                </div>
-              </div>
+              {product.condition === "new" && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold rounded-md uppercase mb-3">
+                  <Check className="h-3 w-3" /> New
+                </span>
+              )}
+              <h2 className="text-2xl font-bold text-white tracking-tight">{product.name}</h2>
+              <p className="text-zinc-500 mt-1">{product.brand}</p>
             </div>
 
-            <div className="text-4xl font-black text-white">
-              {product.price.toLocaleString()} <span className="text-lg font-normal text-slate-400">ETB</span>
+            {/* Rating */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-current text-amber-400" />
+                <span className="text-white font-medium">{product.avg_rating || 0}</span>
+              </div>
+              <span className="text-zinc-600">·</span>
+              <span className="text-zinc-500 text-sm">{product.review_count} reviews</span>
             </div>
 
-            <p className="text-slate-300 leading-relaxed">{product.description}</p>
+            {/* Price */}
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold text-white">{product.price.toLocaleString()}</span>
+              <span className="text-zinc-500">ETB</span>
+            </div>
+
+            {/* Description */}
+            <p className="text-zinc-400 leading-relaxed text-sm">{product.description}</p>
 
             {/* Compatible Cars */}
             {product.compatible_cars?.length > 0 && (
               <div>
-                <h4 className="text-white font-semibold mb-2">Compatible with:</h4>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Compatible with</p>
+                <div className="flex flex-wrap gap-1.5">
                   {product.compatible_cars.map((car, idx) => (
-                    <Badge key={idx} variant="outline" className="border-slate-600 text-slate-300">
+                    <span key={idx} className="px-2.5 py-1 bg-white/[0.04] text-zinc-300 text-xs rounded-lg">
                       {car}
-                    </Badge>
+                    </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Stock Status */}
-            <div className="flex items-center space-x-2">
+            {/* Stock */}
+            <div className="flex items-center gap-2">
               {product.stock > 0 ? (
                 <>
                   <div className="w-2 h-2 bg-emerald-500 rounded-full" />
@@ -144,23 +144,23 @@ export default function ProductModal({ product, onClose }) {
             </div>
 
             {/* Quantity & Add to Cart */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center border border-slate-700 rounded-lg">
+            <div className="flex items-center gap-4 pt-4">
+              <div className="flex items-center bg-white/[0.04] rounded-xl">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="text-slate-300"
+                  className="text-zinc-400 hover:text-white hover:bg-transparent rounded-xl"
                   data-testid="modal-decrease-qty"
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
-                <span className="w-12 text-center text-white">{quantity}</span>
+                <span className="w-10 text-center text-white font-medium">{quantity}</span>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  className="text-slate-300"
+                  className="text-zinc-400 hover:text-white hover:bg-transparent rounded-xl"
                   disabled={quantity >= product.stock}
                   data-testid="modal-increase-qty"
                 >
@@ -169,71 +169,62 @@ export default function ProductModal({ product, onClose }) {
               </div>
 
               <Button
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-6 font-bold btn-glow"
+                className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white h-12 font-medium rounded-xl"
                 onClick={handleAddToCart}
                 disabled={product.stock <= 0}
                 data-testid="modal-add-to-cart"
               >
-                <ShoppingCart className="h-5 w-5 mr-2" />
+                <ShoppingBag className="h-4 w-4 mr-2" />
                 Add to Cart
               </Button>
             </div>
 
-            {/* Features */}
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
-              <div className="flex items-center space-x-2 text-slate-400">
-                <Truck className="h-5 w-5 text-emerald-400" />
-                <span className="text-sm">Fast Delivery</span>
+            {/* Features - Ultra minimal */}
+            <div className="flex items-center gap-6 pt-4 border-t border-white/[0.06]">
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Truck className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+                <span className="text-xs">Express Shipping</span>
               </div>
-              <div className="flex items-center space-x-2 text-slate-400">
-                <Shield className="h-5 w-5 text-emerald-400" />
-                <span className="text-sm">Quality Guaranteed</span>
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Shield className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+                <span className="text-xs">Verified Seller</span>
+              </div>
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Zap className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+                <span className="text-xs">99% Match</span>
               </div>
             </div>
-
-            {/* Seller Info */}
-            {product.seller_name && (
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <p className="text-slate-400 text-sm">Sold by</p>
-                <p className="text-white font-medium">{product.seller_name}</p>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Reviews Section */}
-        <div className="mt-8 border-t border-slate-800 pt-8">
-          <h3 className="text-xl font-bold text-white mb-4">Customer Reviews</h3>
+        {/* Reviews - Clean */}
+        <div className="mt-8 pt-8 border-t border-white/[0.06] px-2">
+          <h3 className="text-lg font-semibold text-white mb-6">Reviews</h3>
           {loading ? (
-            <div className="text-slate-400">Loading reviews...</div>
+            <div className="text-zinc-500 text-sm">Loading...</div>
           ) : reviews.length === 0 ? (
-            <div className="text-slate-400">No reviews yet. Be the first to review!</div>
+            <div className="text-zinc-500 text-sm">No reviews yet</div>
           ) : (
             <div className="space-y-4">
               {reviews.map((review) => (
-                <div key={review.id} className="bg-slate-800/50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-bold">
-                          {review.user_name.charAt(0).toUpperCase()}
-                        </span>
+                <div key={review.id} className="p-4 bg-white/[0.02] rounded-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                        <span className="text-emerald-400 text-xs font-semibold">{review.user_name.charAt(0)}</span>
                       </div>
-                      <span className="text-white font-medium">{review.user_name}</span>
+                      <span className="text-white text-sm font-medium">{review.user_name}</span>
                     </div>
-                    <div className="flex items-center text-amber-400">
+                    <div className="flex items-center gap-0.5">
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          className={`h-4 w-4 ${i < review.rating ? "fill-current" : "text-slate-600"}`}
+                          className={`h-3 w-3 ${i < review.rating ? "fill-current text-amber-400" : "text-zinc-700"}`}
                         />
                       ))}
                     </div>
                   </div>
-                  <p className="text-slate-300 mt-2">{review.comment}</p>
-                  <p className="text-slate-500 text-sm mt-2">
-                    {new Date(review.created_at).toLocaleDateString()}
-                  </p>
+                  <p className="text-zinc-400 text-sm">{review.comment}</p>
                 </div>
               ))}
             </div>
