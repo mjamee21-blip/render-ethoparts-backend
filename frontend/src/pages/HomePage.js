@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import Navbar from "../components/Navbar";
@@ -30,9 +30,25 @@ export default function HomePage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     seedAndFetchData();
+    
+    // Keyboard shortcut for search (Cmd+K)
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+        setTimeout(() => {
+          const searchInput = document.querySelector('[data-testid="search-input"]');
+          if (searchInput) searchInput.focus();
+        }, 500);
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -78,11 +94,20 @@ export default function HomePage() {
     }
   };
 
+  const handleSearchFocus = () => {
+    document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      const searchInput = document.querySelector('[data-testid="search-input"]');
+      if (searchInput) searchInput.focus();
+    }, 500);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-[#0a0a0b]">
       <Navbar 
         onAuthClick={() => setAuthOpen(true)} 
         onCartClick={() => setCartOpen(true)}
+        onSearchFocus={handleSearchFocus}
       />
       
       <main>
