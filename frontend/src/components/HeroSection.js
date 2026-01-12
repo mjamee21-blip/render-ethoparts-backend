@@ -1,4 +1,4 @@
-import { ChevronDown, MapPin, Phone, Truck, Shield, Clock } from "lucide-react";
+import { ArrowRight, Zap, Shield, Truck } from "lucide-react";
 import { Button } from "./ui/button";
 
 export default function HeroSection() {
@@ -7,101 +7,81 @@ export default function HeroSection() {
   };
 
   return (
-    <section id="home" className="relative min-h-screen flex items-center pt-20" data-testid="hero-section">
-      {/* Background */}
-      <div className="absolute inset-0 z-0">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1483671174579-bab2a5293389?w=1920&q=80')`,
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/95 to-slate-950/80" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/50" />
-      </div>
-
+    <section id="home" className="relative min-h-[85vh] flex items-center pt-16" data-testid="hero-section">
+      {/* Subtle gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/[0.03] via-transparent to-transparent" />
+      
       {/* Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left Content */}
-          <div className="space-y-8 animate-fade-in-up">
-            <div className="inline-flex items-center space-x-2 bg-slate-800/50 px-4 py-2 rounded-full">
-              <MapPin className="h-4 w-4 text-emerald-400" />
-              <span className="text-slate-300 text-sm">Addis Ababa, Ethiopia</span>
-            </div>
-
-            <h1 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter">
-              Quality Auto Parts
-              <span className="block gradient-text">For Every Car</span>
-            </h1>
-
-            <p className="text-lg md:text-xl text-slate-400 max-w-xl leading-relaxed">
-              Ethiopia's trusted marketplace for genuine and affordable auto parts. 
-              Connect with verified sellers across Addis Ababa and get the parts you need.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <Button
-                onClick={scrollToProducts}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-6 text-lg font-bold btn-glow"
-                data-testid="browse-parts-btn"
-              >
-                Browse Parts
-              </Button>
-              <Button
-                variant="outline"
-                className="border-slate-600 text-white hover:bg-slate-800 px-8 py-6 text-lg"
-                onClick={() => document.querySelector("#about")?.scrollIntoView({ behavior: "smooth" })}
-                data-testid="learn-more-btn"
-              >
-                Learn More
-              </Button>
-            </div>
-
-            {/* Contact Info */}
-            <div className="flex items-center space-x-4 pt-4">
-              <Phone className="h-5 w-5 text-emerald-400" />
-              <span className="text-white font-semibold">0777770757</span>
-              <span className="text-slate-500">|</span>
-              <span className="text-slate-400">24/7 Support</span>
-            </div>
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 w-full">
+        <div className="max-w-3xl">
+          {/* Smart Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-8 animate-in">
+            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-emerald-400 text-xs font-medium tracking-wide">Ethiopia's #1 Auto Parts Marketplace</span>
           </div>
 
-          {/* Right Content - Feature Cards */}
-          <div className="hidden lg:grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-xl card-hover animate-fade-in-up stagger-1">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                  <Truck className="h-6 w-6 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold">Nationwide Delivery</h3>
-                  <p className="text-slate-400 text-sm">Fast shipping across Ethiopia</p>
-                </div>
+          {/* Headline - Clean & Bold */}
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.05] mb-6 animate-in">
+            Find the right part.
+            <br />
+            <span className="text-zinc-500">Every time.</span>
+          </h1>
+
+          {/* Subtext - Minimal */}
+          <p className="text-lg text-zinc-400 max-w-xl mb-10 leading-relaxed animate-in">
+            Connect with verified sellers across Addis Ababa. Quality parts, transparent pricing, fast delivery.
+          </p>
+
+          {/* CTA Buttons - Flat Design */}
+          <div className="flex flex-wrap gap-3 mb-16 animate-in">
+            <Button
+              onClick={scrollToProducts}
+              className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 h-12 text-sm font-medium rounded-xl transition-all"
+              data-testid="browse-parts-btn"
+            >
+              Browse Parts
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="border-white/10 text-white hover:bg-white/[0.06] px-6 h-12 text-sm font-medium rounded-xl"
+              onClick={() => document.querySelector("#about")?.scrollIntoView({ behavior: "smooth" })}
+              data-testid="learn-more-btn"
+            >
+              Learn More
+            </Button>
+          </div>
+
+          {/* Smart Stats Row */}
+          <div className="flex flex-wrap gap-8 pt-8 border-t border-white/[0.06] animate-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/[0.04] rounded-xl flex items-center justify-center">
+                <Truck className="h-5 w-5 text-emerald-400" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p className="text-white text-sm font-medium">Express Delivery</p>
+                <p className="text-zinc-500 text-xs">24-48 hours</p>
               </div>
             </div>
-
-            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-xl card-hover animate-fade-in-up stagger-2">
-              <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center mb-4">
-                <Shield className="h-6 w-6 text-amber-400" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/[0.04] rounded-xl flex items-center justify-center">
+                <Shield className="h-5 w-5 text-emerald-400" strokeWidth={1.5} />
               </div>
-              <h3 className="text-white font-bold">Verified Sellers</h3>
-              <p className="text-slate-400 text-sm">Trusted merchants only</p>
+              <div>
+                <p className="text-white text-sm font-medium">Verified Sellers</p>
+                <p className="text-zinc-500 text-xs">100% trusted</p>
+              </div>
             </div>
-
-            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-xl card-hover animate-fade-in-up stagger-3">
-              <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center mb-4">
-                <Clock className="h-6 w-6 text-red-400" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/[0.04] rounded-xl flex items-center justify-center">
+                <Zap className="h-5 w-5 text-emerald-400" strokeWidth={1.5} />
               </div>
-              <h3 className="text-white font-bold">Order Tracking</h3>
-              <p className="text-slate-400 text-sm">Real-time updates</p>
+              <div>
+                <p className="text-white text-sm font-medium">Smart Match</p>
+                <p className="text-zinc-500 text-xs">99% compatibility</p>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <ChevronDown className="h-8 w-8 text-slate-500" />
         </div>
       </div>
     </section>

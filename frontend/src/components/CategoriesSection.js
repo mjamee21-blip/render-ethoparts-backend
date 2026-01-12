@@ -1,4 +1,4 @@
-import { Cog, Disc, Gauge, Zap, Car, Filter, Lightbulb, Circle } from "lucide-react";
+import { Cog, Disc, Gauge, Zap, Car, Filter, Lightbulb, Circle, ArrowRight } from "lucide-react";
 
 const iconMap = {
   engine: Cog,
@@ -12,62 +12,85 @@ const iconMap = {
 };
 
 export default function CategoriesSection({ categories, selectedCategory, onSelectCategory }) {
+  // Bento grid layout - first 2 are large, rest are small
+  const getBentoClass = (index) => {
+    if (index === 0) return "col-span-2 row-span-2";
+    if (index === 1) return "col-span-2";
+    return "col-span-1";
+  };
+
   return (
-    <section id="categories" className="py-20 bg-slate-900" data-testid="categories-section">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="text-emerald-400 text-sm font-semibold tracking-widest uppercase">
-            Shop by Category
-          </span>
-          <h2 className="text-3xl md:text-5xl font-black text-white mt-2 tracking-tight">
-            Find What You Need
-          </h2>
+    <section id="categories" className="py-20 px-6" data-testid="categories-section">
+      <div className="max-w-7xl mx-auto">
+        {/* Section Header - Minimal */}
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <p className="text-emerald-400 text-xs font-semibold tracking-widest uppercase mb-2">Categories</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Find What You Need</h2>
+          </div>
+          <button 
+            onClick={() => onSelectCategory("")}
+            className="hidden sm:flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
+          >
+            View all <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-          {/* All Categories */}
+        {/* Bento Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 auto-rows-[100px]">
+          {/* All Parts - Featured */}
           <button
             onClick={() => onSelectCategory("")}
-            className={`group flex flex-col items-center p-4 rounded-xl transition-all ${
+            className={`group relative overflow-hidden rounded-2xl p-5 transition-all ${
               selectedCategory === ""
-                ? "bg-emerald-500/20 border-emerald-500"
-                : "bg-slate-800/50 border-slate-700 hover:border-emerald-500/50"
-            } border`}
+                ? "bg-emerald-500/10 border border-emerald-500/30"
+                : "bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/10"
+            } col-span-2 row-span-2`}
             data-testid="category-all"
           >
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 transition-colors ${
-              selectedCategory === "" ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400"
-            }`}>
-              <Cog className="h-6 w-6" />
+            <div className="flex flex-col h-full justify-between">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                selectedCategory === "" ? "bg-emerald-500/20" : "bg-white/[0.04] group-hover:bg-white/[0.06]"
+              }`}>
+                <Cog className={`h-6 w-6 ${selectedCategory === "" ? "text-emerald-400" : "text-zinc-400 group-hover:text-white"}`} strokeWidth={1.5} />
+              </div>
+              <div className="text-left">
+                <p className={`text-lg font-semibold ${selectedCategory === "" ? "text-emerald-400" : "text-white"}`}>All Parts</p>
+                <p className="text-zinc-500 text-sm mt-1">Browse entire catalog</p>
+              </div>
             </div>
-            <span className={`text-sm font-medium ${selectedCategory === "" ? "text-emerald-400" : "text-slate-300"}`}>
-              All Parts
-            </span>
+            {/* Data point badge */}
+            <div className="absolute top-4 right-4">
+              <span className="px-2 py-1 bg-white/[0.06] rounded-md text-[10px] font-medium text-zinc-400">500+ items</span>
+            </div>
           </button>
 
-          {categories.map((category) => {
+          {categories.slice(0, 6).map((category, index) => {
             const Icon = iconMap[category.icon] || Cog;
             const isSelected = selectedCategory === category.id;
+            const isLarge = index === 0;
 
             return (
               <button
                 key={category.id}
                 onClick={() => onSelectCategory(category.id)}
-                className={`group flex flex-col items-center p-4 rounded-xl transition-all ${
+                className={`group relative overflow-hidden rounded-2xl p-4 transition-all text-left ${
                   isSelected
-                    ? "bg-emerald-500/20 border-emerald-500"
-                    : "bg-slate-800/50 border-slate-700 hover:border-emerald-500/50"
-                } border`}
+                    ? "bg-emerald-500/10 border border-emerald-500/30"
+                    : "bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/10"
+                } ${isLarge ? "col-span-2" : "col-span-1"}`}
                 data-testid={`category-${category.id}`}
               >
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 transition-colors ${
-                  isSelected ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400"
-                }`}>
-                  <Icon className="h-6 w-6" />
+                <div className="flex flex-col h-full justify-between">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                    isSelected ? "bg-emerald-500/20" : "bg-white/[0.04] group-hover:bg-white/[0.06]"
+                  }`}>
+                    <Icon className={`h-5 w-5 ${isSelected ? "text-emerald-400" : "text-zinc-400 group-hover:text-white"}`} strokeWidth={1.5} />
+                  </div>
+                  <p className={`text-sm font-medium mt-3 ${isSelected ? "text-emerald-400" : "text-zinc-300 group-hover:text-white"}`}>
+                    {category.name}
+                  </p>
                 </div>
-                <span className={`text-sm font-medium text-center ${isSelected ? "text-emerald-400" : "text-slate-300"}`}>
-                  {category.name}
-                </span>
               </button>
             );
           })}
