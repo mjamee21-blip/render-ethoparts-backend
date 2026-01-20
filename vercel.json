@@ -16,7 +16,7 @@
     }
   ],
   "env": {
-    "CORS_ORIGINS": "https://frontend-jacltpcjx-alexs-projects-1690fd3f.vercel.app,https://ethiopartshub.preview.emergentagent.com,http://localhost:3000",
+    "CORS_ORIGINS": "https://frontend-jacltpcjx-alexs-projects-1690fd3f.vercel.app,https://ethiopartshub.preview.emergentagent.com,http://localhost:3000,https://e58567a2.ethiopartshub-frontend.pages.dev",
     "JWT_SECRET": "etho-parts-secret-key-2024-secure"
   }
 }

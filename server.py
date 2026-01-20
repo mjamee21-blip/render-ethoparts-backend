@@ -24,26 +24,60 @@ load_dotenv(ROOT_DIR / '.env')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Firebase initialization
-if not firebase_admin._apps:
-    # In Firebase Functions, credentials are automatically available
-    # For local development, you can set GOOGLE_APPLICATION_CREDENTIALS
-    try:
-        cred = None
-        if os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'):
-            logger.info("Using GOOGLE_APPLICATION_CREDENTIALS for Firebase auth")
-            cred = credentials.Certificate(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
-        else:
-            logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set, relying on automatic credentials")
-        firebase_admin.initialize_app(credential=cred, options={
-            'projectId': 'ethopartshtml5'
-        })
-        logger.info("Firebase initialized successfully")
-    except Exception as e:
-        logger.error(f"Firebase initialization failed: {str(e)}")
-        raise e
+def get_db():
+    if not firebase_admin._apps:
+        try:
+            firebase_service_account = {
+                "type": "service_account",
+                "project_id": "ethopartshtml5",
+                "private_key_id": "d8a4319d81a2bed3a89de2abe2aebb52ea1fbf00",
+                "private_key": """-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCxTJMR5oPoMFg/
+PwJ5UM/gl5eyYQrvKthtJu3B5QGLhf1EsKPtnY/Xr1OI0OysUsvlRf3RghCl+tQh
+kwY49Ym4a9waGPjhbpFjG8v25qSRaPGX36RFyMpXOp01sVnsLLIqBQ32PQpfa7m0
+4kCl3e5keuulm73OvMQ6gcD98UPM3gVLzD+Bj5hS2HBrpRq4d7mKyQn3q/9gUXpr
+xnENVWiDvGU85fA4QkXVps9UmeCAPkX5DLTfEx8ZHkfMZ3eiR4Cx7aqTUIkrsNQe
+Du6GnTpW3aQ20Hmkl0qUT6Q9PcKlgUB8DFb2u9KO4K9opZ9xZdPRxF3N4dhUpd/M
+OSv5+Qw3AgMBAAECggEAMAW0pBmSytYlYOQZMHDSDVwiC3+7bXJmcpIjvevgUkE1
+i2Bo1lhh+KKVdq5YHIjEj1I44IFhLwPUZ0+iVNU0u04DrNHsv2qqWHTT9wkbtAL/
+xQofPYOYQq4unLdvyseEbls2H+cCozvTbgoGRqbpBjBBGXconxGD+PDiLCYoHhnl
+KS1LJnTc5IsVvN6/r9xPOvlrD7Uxi1VFLp2aCOkccCxg17rJAhi2MHsqKboBvAVE
+WzzVD4mf6onkMrRzgj/d3ASPK8bNGIuLohO/anH4jjJ1NQFKVaT3JsvLGntJMHXr
+mCsEOoFDQmESYlYpPiqTtcSE+cxaxV0r9tU2yuxT0QKBgQDiMkfan+6Dqpmn06KZ
+HC9Rx5EIJCU3SX0s9j/9q7KZrpNoFV1dZjg8yNfDGwVCij7n7cCik44O8KFVUghR
+EZoA/bLUh3360S1aghQro2r8iAFLG2MiwhBdTET/jK1P5MrabbpufbxKunv8fkzI
+T9oEnsUVqhy9zkdi/HTYNn1rKQKBgQDIqPanFKcwwmCzDGLV2ngngnwXcU+WBhae
+4sIpY/wPF3z+xKJ6jOfO+JHrUO1Gb2KZCT8d0Af2abwW2vzkciQ7N4iYZyQn8J66
+wfX7B0nKxyjKs0uLXdBk4lrUXSwXnHRncGwQOc88UpuE7t4aZ1XfuLZMEoCbTO2e
+UCzj3Q0IXwKBgGRzT9WXEKUILhSJt7um+Jyos4+Z/az/xcch1Gkixr3Y+T1Pv5aq
+vm7AApFyfnN+UVFOFC4euQeJdRwewfK+jlXCVJhtU1T/b9Sxz6NRf0GGZIymLPBS
+nlHQfRO/tXe1cyBtek13KRdGmakXraGHVJqYp41nbjwcTzd2Ra1/BVOBAoGAGfhU
+Q/eWU+c0YLf/qrHlzydCLD6MEFylXNb4TicUnldp5AdLCBVogw8Ew7Hro6wS1L+v
+nYopHak9oK+i/2YObmOXmDHxKgIoaP9leKHO2SHBk8p0worXx9bL7qRIap3jKugP
+9GGnAqWmXyQTNtOc96GOZnYWkwL31f+Gb89SOn0CgYBmI1EHZoGu/MDYRXq0n9b5
+hyF9Vzu0eqFEmrIHjrg8MpSwzbpPeMr3+exuPSFKP5wsD/DGoWpqn0vNacgmYZEN
+y2M2onU4JKUZPRJ6qCFGoa9hbwKcy97gjpVC7O/ZNeusxZJBFEOQbOqRWawwtqJo
+skVy6uKmdoAEl66jMuMlHg==
+-----END PRIVATE KEY-----""",
+                "client_email": "firebase-adminsdk-fbsvc@ethopartshtml5.iam.gserviceaccount.com",
+                "client_id": "115203612154037825922",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40ethopartshtml5.iam.gserviceaccount.com",
+                "universe_domain": "googleapis.com"
+            }
+            cred = credentials.Certificate(firebase_service_account)
+            firebase_admin.initialize_app(credential=cred, options={
+                'projectId': 'ethopartshtml5'
+            })
+            logger.info("Firebase initialized successfully")
+        except Exception as e:
+            logger.error(f"Firebase initialization failed: {str(e)}")
+            raise e
+    return firestore.client()
 
-db = firestore.client()
+db = get_db()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -167,7 +201,7 @@ JWT_EXPIRATION_HOURS = 24
 COMMISSION_RATE = 0.10  # 10%
 COMMISSION_DUE_HOURS = 48
 
-app = FastAPI(title="Etho Parts API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Etho Parts API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
@@ -1583,17 +1617,14 @@ async def root():
 
 app.include_router(api_router)
 
+# CORS configuration from environment
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000')
+allow_origins = [origin.strip() for origin in cors_origins.split(',')]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=[
-        "https://ethopartshtml5.web.app",
-        "https://ethopartshtml5.firebaseapp.com",
-        "http://localhost:3000",
-        "https://frontend-smoky-six-82.vercel.app",
-        "https://ethiopartshub.preview.emergentagent.com",
-        "https://ethiopartshub.pages.dev"
-    ],
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

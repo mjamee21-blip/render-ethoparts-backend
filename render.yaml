@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ethopartshub-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://fbb92a98.ethiopartshub-frontend.pages.dev,http://localhost:3000
+      - key: JWT_SECRET
+        value: etho-parts-secret-key-2024-secure
+    plan: free
