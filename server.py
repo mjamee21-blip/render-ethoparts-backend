@@ -20,6 +20,10 @@ import base64
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Firebase initialization
 if not firebase_admin._apps:
     # In Firebase Functions, credentials are automatically available
