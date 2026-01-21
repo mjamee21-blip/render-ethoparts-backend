@@ -4,8 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import firebase_admin
-from firebase_admin import credentials, firestore
+from supabase import create_client, Client
 import os
 import logging
 from pathlib import Path
@@ -27,64 +26,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_db():
-    if not firebase_admin._apps:
-        try:
-            cred_json = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-            if cred_json:
-                logger.info("Using GOOGLE_APPLICATION_CREDENTIALS for Firebase auth")
-                cred_dict = json.loads(cred_json)
-                cred = credentials.Certificate(cred_dict)
-            else:
-                logger.info("Using hardcoded Firebase credentials")
-                firebase_service_account = {
-                    "type": "service_account",
-                    "project_id": "ethopartshtml5",
-                    "private_key_id": "d8a4319d81a2bed3a89de2abe2aebb52ea1fbf00",
-                    "private_key": """-----BEGIN PRIVATE KEY-----
-MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCxTJMR5oPoMFg/
-PwJ5UM/gl5eyYQrvKthtJu3B5QGLhf1EsKPtnY/Xr1OI0OysUsvlRf3RghCl+tQh
-kwY49Ym4a9waGPjhbpFjG8v25qSRaPGX36RFyMpXOp01sVnsLLIqBQ32PQpfa7m0
-4kCl3e5keuulm73OvMQ6gcD98UPM3gVLzD+Bj5hS2HBrpRq4d7mKyQn3q/9gUXpr
-xnENVWiDvGU85fA4QkXVps9UmeCAPkX5DLTfEx8ZHkfMZ3eiR4Cx7aqTUIkrsNQe
-Du6GnTpW3aQ20Hmkl0qUT6Q9PcKlgUB8DFb2u9KO4K9opZ9xZdPRxF3N4dhUpd/M
-OSv5+Qw3AgMBAAECggEAMAW0pBmSytYlYOQZMHDSDVwiC3+7bXJmcpIjvevgUkE1
-i2Bo1lhh+KKVdq5YHIjEj1I44IFhLwPUZ0+iVNU0u04DrNHsv2qqWHTT9wkbtAL/
-xQofPYOYQq4unLdvyseEbls2H+cCozvTbgoGRqbpBjBBGXconxGD+PDiLCYoHhnl
-KS1LJnTc5IsVvN6/r9xPOvlrD7Uxi1VFLp2aCOkccCxg17rJAhi2MHsqKboBvAVE
-WzzVD4mf6onkMrRzgj/d3ASPK8bNGIuLohO/anH4jjJ1NQFKVaT3JsvLGntJMHXr
-mCsEOoFDQmESYlYpPiqTtcSE+cxaxV0r9tU2yuxT0QKBgQDiMkfan+6Dqpmn06KZ
-HC9Rx5EIJCU3SX0s9j/9q7KZrpNoFV1dZjg8yNfDGwVCij7n7cCik44O8KFVUghR
-EZoA/bLUh3360S1aghQro2r8iAFLG2MiwhBdTET/jK1P5MrabbpufbxKunv8fkzI
-T9oEnsUVqhy9zkdi/HTYNn1rKQKBgQDIqPanFKcwwmCzDGLV2ngngnwXcU+WBhae
-4sIpY/wPF3z+xKJ6jOfO+JHrUO1Gb2KZCT8d0Af2abwW2vzkciQ7N4iYZyQn8J66
-wfX7B0nKxyjKs0uLXdBk4lrUXSwXnHRncGwQOc88UpuE7t4aZ1XfuLZMEoCbTO2e
-UCzj3Q0IXwKBgGRzT9WXEKUILhSJt7um+Jyos4+Z/az/xcch1Gkixr3Y+T1Pv5aq
-vm7AApFyfnN+UVFOFC4euQeJdRwewfK+jlXCVJhtU1T/b9Sxz6NRf0GGZIymLPBS
-nlHQfRO/tXe1cyBtek13KRdGmakXraGHVJqYp41nbjwcTzd2Ra1/BVOBAoGAGfhU
-Q/eWU+c0YLf/qrHlzydCLD6MEFylXNb4TicUnldp5AdLCBVogw8Ew7Hro6wS1L+v
-nYopHak9oK+i/2YObmOXmDHxKgIoaP9leKHO2SHBk8p0worXx9bL7qRIap3jKugP
-9GGnAqWmXyQTNtOc96GOZnYWkwL31f+Gb89SOn0CgYBmI1EHZoGu/MDYRXq0n9b5
-hyF9Vzu0eqFEmrIHjrg8MpSwzbpPeMr3+exuPSFKP5wsD/DGoWpqn0vNacgmYZEN
-y2M2onU4JKUZPRJ6qCFGoa9hbwKcy97gjpVC7O/ZNeusxZJBFEOQbOqRWawwtqJo
-skVy6uKmdoAEl66jMuMlHg==
------END PRIVATE KEY-----""",
-                    "client_email": "firebase-adminsdk-fbsvc@ethopartshtml5.iam.gserviceaccount.com",
-                    "client_id": "115203612154037825922",
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40ethopartshtml5.iam.gserviceaccount.com",
-                    "universe_domain": "googleapis.com"
-                }
-                cred = credentials.Certificate(firebase_service_account)
-            firebase_admin.initialize_app(credential=cred, options={
-                'projectId': 'ethopartshtml5'
-            })
-            logger.info("Firebase initialized successfully")
-        except Exception as e:
-            logger.error(f"Firebase initialization failed: {str(e)}")
-            raise e
-    return firestore.client()
+    try:
+        supabase_url = "https://uxxdeugjmphlayhkvhkjc.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4eGRldWdqbXBobGF5aGt2a2hjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDk2NTU1OCwiZXhwIjoyMDgwNTQxNTU4fQ.A3UJK-H3VJe6NVZnaO7fYiCjck8WADmquriNrw0V-C0"
+        supabase: Client = create_client(supabase_url, supabase_key)
+        logger.info("Supabase initialized successfully")
+        return supabase
+    except Exception as e:
+        logger.error(f"Supabase initialization failed: {str(e)}")
+        raise e
 
 db = get_db()
 
@@ -92,8 +42,8 @@ db = get_db()
 async def lifespan(app: FastAPI):
     # Startup: seed data if not seeded
     try:
-        users_ref = db.collection('users')
-        if len(list(users_ref.stream())) == 0:
+        users_count = len(db.table('users').select('*').execute().data)
+        if users_count == 0:
             logger.info("Seeding initial data...")
             # Seed payment methods
             payment_methods = [
@@ -111,16 +61,16 @@ async def lifespan(app: FastAPI):
 
             for pm in payment_methods:
                 pm["created_at"] = datetime.now(timezone.utc).isoformat()
-                db.collection('payment_methods').document(pm["id"]).set(pm)
+                db.table('payment_methods').insert(pm).execute()
 
             # Set default admin commission payment method (Telebirr)
-            db.collection('settings').document('commission_payment_method').set({
+            db.table('settings').insert({
                 "key": "commission_payment_method",
                 "payment_method_id": payment_methods[0]["id"],
                 "account_name": "Etho Parts Admin",
                 "account_number": "0777770757",
                 "updated_at": datetime.now(timezone.utc).isoformat()
-            })
+            }).execute()
 
             # Seed categories
             categories = [
@@ -135,7 +85,7 @@ async def lifespan(app: FastAPI):
             ]
 
             for cat in categories:
-                db.collection('categories').document(cat["id"]).set(cat)
+                db.table('categories').insert(cat).execute()
 
             # Seed admin user
             admin_user = {
@@ -150,7 +100,7 @@ async def lifespan(app: FastAPI):
                 "enabled_payment_methods": [],
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
-            db.collection('users').document(admin_user["id"]).set(admin_user)
+            db.table('users').insert(admin_user).execute()
 
             # Seed seller user
             seller_user = {
@@ -165,7 +115,7 @@ async def lifespan(app: FastAPI):
                 "enabled_payment_methods": [payment_methods[0]["id"], payment_methods[5]["id"]],
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
-            db.collection('users').document(seller_user["id"]).set(seller_user)
+            db.table('users').insert(seller_user).execute()
 
             # Add seller payment methods
             seller_payment_methods = [
@@ -190,7 +140,7 @@ async def lifespan(app: FastAPI):
             ]
 
             for spm in seller_payment_methods:
-                db.collection('seller_payment_methods').document(spm["id"]).set(spm)
+                db.table('seller_payment_methods').insert(spm).execute()
 
             logger.info("Initial data seeded successfully")
     except Exception as e:
@@ -429,10 +379,10 @@ def create_token(user_id: str, role: str) -> str:
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_doc = db.collection('users').document(payload["user_id"]).get()
-        if not user_doc.exists:
+        user_doc = db.table('users').select('*').eq('id', payload["user_id"]).limit(1).execute()
+        if len(user_doc.data) == 0:
             raise HTTPException(status_code=401, detail="User not found")
-        user = user_doc.to_dict()
+        user = user_doc.data[0]
         if 'password' in user:
             del user['password']
         return user
@@ -445,9 +395,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 @api_router.post("/auth/register", response_model=dict)
 async def register(user_data: UserCreate):
     # Check if email already exists
-    users_ref = db.collection('users')
-    existing = users_ref.where('email', '==', user_data.email).limit(1).get()
-    if len(existing) > 0:
+    existing = db.table('users').select('*').eq('email', user_data.email).limit(1).execute()
+    if len(existing.data) > 0:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user_id = str(uuid.uuid4())
@@ -463,18 +412,17 @@ async def register(user_data: UserCreate):
         "enabled_payment_methods": [],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    db.collection('users').document(user_id).set(user_dict)
+    db.table('users').insert(user_dict).execute()
     token = create_token(user_dict["id"], user_dict["role"])
     return {"token": token, "user": {k: v for k, v in user_dict.items() if k != "password"}}
 
 @api_router.post("/auth/login", response_model=dict)
 async def login(credentials: UserLogin):
-    users_ref = db.collection('users')
-    user_docs = users_ref.where('email', '==', credentials.email).limit(1).get()
-    if len(user_docs) == 0:
+    user_docs = db.table('users').select('*').eq('email', credentials.email).limit(1).execute()
+    if len(user_docs.data) == 0:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user = user_docs[0].to_dict()
+    user = user_docs.data[0]
     if not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -489,12 +437,10 @@ async def get_me(user: dict = Depends(get_current_user)):
 @api_router.get("/payment-methods")
 async def get_payment_methods(enabled_only: bool = False):
     """Get all payment methods (public)"""
-    methods_ref = db.collection('payment_methods')
     if enabled_only:
-        docs = methods_ref.where('enabled', '==', True).stream()
+        methods = db.table('payment_methods').select('*').eq('enabled', True).execute().data
     else:
-        docs = methods_ref.stream()
-    methods = [doc.to_dict() for doc in docs]
+        methods = db.table('payment_methods').select('*').execute().data
     return methods
 
 @api_router.get("/payment-methods/admin")
@@ -502,7 +448,7 @@ async def get_all_payment_methods(user: dict = Depends(get_current_user)):
     """Get all payment methods for admin"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    methods = [doc.to_dict() for doc in db.collection('payment_methods').stream()]
+    methods = db.table('payment_methods').select('*').execute().data
     return methods
 
 @api_router.post("/payment-methods")
@@ -522,7 +468,7 @@ async def create_payment_method(method: PaymentMethodCreate, user: dict = Depend
         "enabled": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    db.collection('payment_methods').document(method_dict["id"]).set(method_dict)
+    db.table('payment_methods').insert(method_dict).execute()
     return method_dict
 
 @api_router.put("/payment-methods/{method_id}")
@@ -531,15 +477,16 @@ async def update_payment_method(method_id: str, update: PaymentMethodUpdate, use
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
 
-    method_doc = db.collection('payment_methods').document(method_id)
-    if not method_doc.get().exists:
+    existing = db.table('payment_methods').select('*').eq('id', method_id).limit(1).execute()
+    if len(existing.data) == 0:
         raise HTTPException(status_code=404, detail="Payment method not found")
 
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
-        method_doc.update(update_data)
+        db.table('payment_methods').update(update_data).eq('id', method_id).execute()
 
-    return method_doc.get().to_dict()
+    updated = db.table('payment_methods').select('*').eq('id', method_id).limit(1).execute().data[0]
+    return updated
 
 @api_router.delete("/payment-methods/{method_id}")
 async def delete_payment_method(method_id: str, user: dict = Depends(get_current_user)):
@@ -547,7 +494,7 @@ async def delete_payment_method(method_id: str, user: dict = Depends(get_current
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
 
-    db.collection('payment_methods').document(method_id).delete()
+    db.table('payment_methods').delete().eq('id', method_id).execute()
     return {"message": "Payment method deleted"}
 
 @api_router.post("/payment-methods/{method_id}/toggle")
@@ -556,13 +503,12 @@ async def toggle_payment_method(method_id: str, user: dict = Depends(get_current
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
 
-    method_doc = db.collection('payment_methods').document(method_id)
-    method_data = method_doc.get().to_dict()
-    if not method_data:
+    method_data = db.table('payment_methods').select('*').eq('id', method_id).limit(1).execute()
+    if len(method_data.data) == 0:
         raise HTTPException(status_code=404, detail="Payment method not found")
 
-    new_status = not method_data.get("enabled", True)
-    method_doc.update({"enabled": new_status})
+    new_status = not method_data.data[0].get("enabled", True)
+    db.table('payment_methods').update({"enabled": new_status}).eq('id', method_id).execute()
     return {"enabled": new_status}
 
 # ======================== SELLER PAYMENT METHOD ROUTES ========================
@@ -680,10 +626,7 @@ async def get_seller_available_payment_methods(seller_id: str):
 # ======================== CATEGORY ROUTES ========================
 @api_router.get("/categories", response_model=List[CategoryResponse])
 async def get_categories():
-    categories = []
-    docs = db.collection('categories').stream()
-    for doc in docs:
-        categories.append(doc.to_dict())
+    categories = db.table('categories').select('*').execute().data
     return categories
 
 @api_router.post("/categories", response_model=CategoryResponse)
@@ -698,7 +641,7 @@ async def create_category(category: CategoryCreate, user: dict = Depends(get_cur
         "description": category.description,
         "icon": category.icon
     }
-    db.collection('categories').document(cat_id).set(cat_dict)
+    db.table('categories').insert(cat_dict).execute()
     return cat_dict
 
 # ======================== PRODUCT ROUTES ========================
@@ -714,24 +657,23 @@ async def get_products(
     skip: int = 0,
     limit: int = 50
 ):
-    products_ref = db.collection('products')
+    query = db.table('products').select('*')
 
     # Apply filters
-    query = products_ref
     if category_id:
-        query = query.where('category_id', '==', category_id)
+        query = query.eq('category_id', category_id)
     if condition:
-        query = query.where('condition', '==', condition.value)
+        query = query.eq('condition', condition.value)
     if seller_id:
-        query = query.where('seller_id', '==', seller_id)
+        query = query.eq('seller_id', seller_id)
 
     # Get documents
-    docs = query.offset(skip).limit(limit).stream()
-    products = []
+    result = query.range(skip, skip + limit - 1).execute()
+    products = result.data
 
-    for doc in docs:
-        product = doc.to_dict()
-        # Apply additional filters that Firestore doesn't support natively
+    # Apply additional filters that Supabase doesn't support natively in the same query
+    filtered_products = []
+    for product in products:
         if brand and brand.lower() not in product.get('brand', '').lower():
             continue
         if min_price is not None and product.get('price', 0) < min_price:
@@ -746,18 +688,18 @@ async def get_products(
                 continue
 
         # Add category and seller info
-        category_doc = db.collection('categories').document(product["category_id"]).get()
-        if category_doc.exists:
-            product["category_name"] = category_doc.to_dict()["name"]
+        category_doc = db.table('categories').select('name').eq('id', product["category_id"]).limit(1).execute()
+        if len(category_doc.data) > 0:
+            product["category_name"] = category_doc.data[0]["name"]
 
-        seller_doc = db.collection('users').document(product["seller_id"]).get()
-        if seller_doc.exists:
-            seller_data = seller_doc.to_dict()
+        seller_doc = db.table('users').select('business_name', 'name').eq('id', product["seller_id"]).limit(1).execute()
+        if len(seller_doc.data) > 0:
+            seller_data = seller_doc.data[0]
             product["seller_name"] = seller_data.get("business_name") or seller_data["name"]
 
-        products.append(product)
+        filtered_products.append(product)
 
-    return products
+    return filtered_products
 
 @api_router.get("/products/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: str):
@@ -799,7 +741,7 @@ async def create_product(product: ProductCreate, user: dict = Depends(get_curren
         "review_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    db.collection('products').document(product_dict["id"]).set(product_dict)
+    db.table('products').insert(product_dict).execute()
     product_dict["seller_name"] = user.get("business_name") or user["name"]
     return product_dict
 
