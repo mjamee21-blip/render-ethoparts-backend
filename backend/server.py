@@ -825,12 +825,12 @@ async def create_order(order_data: OrderCreate, user: dict = Depends(get_current
     items_with_details = []
     total_amount = 0
     sellers = set()
-    
+
     for item in order_data.items:
-        product_doc = db.collection('products').document(item.product_id).get()
-        if not product_doc.exists:
+        product_docs = db.table('products').select('*').eq('id', item.product_id).execute()
+        if len(product_docs.data) == 0:
             raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found")
-        product = product_doc.to_dict()
+        product = product_docs.data[0]
         if product["stock"] < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for {product['name']}")
 
@@ -847,17 +847,17 @@ async def create_order(order_data: OrderCreate, user: dict = Depends(get_current
         })
 
     # Validate payment method
-    seller_method_doc = db.collection('seller_payment_methods').document(order_data.payment_method_id).get()
-    if not seller_method_doc.exists:
+    seller_method_docs = db.table('seller_payment_methods').select('*').eq('id', order_data.payment_method_id).execute()
+    if len(seller_method_docs.data) == 0:
         raise HTTPException(status_code=400, detail="Invalid payment method")
-    seller_method = seller_method_doc.to_dict()
+    seller_method = seller_method_docs.data[0]
 
-    payment_method_doc = db.collection('payment_methods').document(seller_method["payment_method_id"]).get()
-    payment_method = payment_method_doc.to_dict() if payment_method_doc.exists else None
-    
+    payment_method_docs = db.table('payment_methods').select('*').eq('id', seller_method["payment_method_id"]).execute()
+    payment_method = payment_method_docs.data[0] if len(payment_method_docs.data) > 0 else None
+
     commission_amount = round(total_amount * COMMISSION_RATE, 2)
     order_number = f"EP-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
-    
+
     order_dict = {
         "id": str(uuid.uuid4()),
         "order_number": order_number,
@@ -883,13 +883,13 @@ async def create_order(order_data: OrderCreate, user: dict = Depends(get_current
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
 
-    db.collection('orders').document(order_dict["id"]).set(order_dict)
+    db.table('orders').insert(order_dict).execute()
 
-    # Update stock
+    # Update stock - Supabase doesn't have Increment, so we need to get current stock and update
     for item in order_data.items:
-        db.collection('products').document(item.product_id).update({
-            "stock": firestore.Increment(-item.quantity)
-        })
+        current_product = db.table('products').select('stock').eq('id', item.product_id).execute().data[0]
+        new_stock = current_product['stock'] - item.quantity
+        db.table('products').update({"stock": new_stock}).eq('id', item.product_id).execute()
 
     return order_dict
 
