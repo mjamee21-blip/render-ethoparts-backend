@@ -79,3 +79,8 @@ agenthub/agents/youtube/db
 # Mobile development
 android-sdk/ frontend/node_modules/.cache/default-development/0.pack
 frontend/node_modules/.cache/default-development/0.pack
+backend/.git/objects/pack/pack-325d7c27972555acd1cc4f3aa7bb09561e7341e3.pack
+frontend/node_modules/workerd/bin/workerd
+frontend/node_modules/@cloudflare/workerd-linux-arm64/bin/workerd
+node_modules/workerd/bin/workerd
+node_modules/@cloudflare/workerd-linux-arm64/bin/workerd

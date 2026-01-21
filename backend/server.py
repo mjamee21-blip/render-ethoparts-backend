@@ -2,7 +2,9 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, U
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from contextlib import asynccontextmanager
+import firebase_admin
+from firebase_admin import credentials, firestore
 import os
 import logging
 from pathlib import Path
@@ -14,14 +16,189 @@ import jwt
 import bcrypt
 from enum import Enum
 import base64
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def get_db():
+    if not firebase_admin._apps:
+        try:
+            cred_json = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+            if cred_json:
+                logger.info("Using GOOGLE_APPLICATION_CREDENTIALS for Firebase auth")
+                cred_dict = json.loads(cred_json)
+                cred = credentials.Certificate(cred_dict)
+            else:
+                logger.info("Using hardcoded Firebase credentials")
+                firebase_service_account = {
+                    "type": "service_account",
+                    "project_id": "ethopartshtml5",
+                    "private_key_id": "d8a4319d81a2bed3a89de2abe2aebb52ea1fbf00",
+                    "private_key": """-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCxTJMR5oPoMFg/
+PwJ5UM/gl5eyYQrvKthtJu3B5QGLhf1EsKPtnY/Xr1OI0OysUsvlRf3RghCl+tQh
+kwY49Ym4a9waGPjhbpFjG8v25qSRaPGX36RFyMpXOp01sVnsLLIqBQ32PQpfa7m0
+4kCl3e5keuulm73OvMQ6gcD98UPM3gVLzD+Bj5hS2HBrpRq4d7mKyQn3q/9gUXpr
+xnENVWiDvGU85fA4QkXVps9UmeCAPkX5DLTfEx8ZHkfMZ3eiR4Cx7aqTUIkrsNQe
+Du6GnTpW3aQ20Hmkl0qUT6Q9PcKlgUB8DFb2u9KO4K9opZ9xZdPRxF3N4dhUpd/M
+OSv5+Qw3AgMBAAECggEAMAW0pBmSytYlYOQZMHDSDVwiC3+7bXJmcpIjvevgUkE1
+i2Bo1lhh+KKVdq5YHIjEj1I44IFhLwPUZ0+iVNU0u04DrNHsv2qqWHTT9wkbtAL/
+xQofPYOYQq4unLdvyseEbls2H+cCozvTbgoGRqbpBjBBGXconxGD+PDiLCYoHhnl
+KS1LJnTc5IsVvN6/r9xPOvlrD7Uxi1VFLp2aCOkccCxg17rJAhi2MHsqKboBvAVE
+WzzVD4mf6onkMrRzgj/d3ASPK8bNGIuLohO/anH4jjJ1NQFKVaT3JsvLGntJMHXr
+mCsEOoFDQmESYlYpPiqTtcSE+cxaxV0r9tU2yuxT0QKBgQDiMkfan+6Dqpmn06KZ
+HC9Rx5EIJCU3SX0s9j/9q7KZrpNoFV1dZjg8yNfDGwVCij7n7cCik44O8KFVUghR
+EZoA/bLUh3360S1aghQro2r8iAFLG2MiwhBdTET/jK1P5MrabbpufbxKunv8fkzI
+T9oEnsUVqhy9zkdi/HTYNn1rKQKBgQDIqPanFKcwwmCzDGLV2ngngnwXcU+WBhae
+4sIpY/wPF3z+xKJ6jOfO+JHrUO1Gb2KZCT8d0Af2abwW2vzkciQ7N4iYZyQn8J66
+wfX7B0nKxyjKs0uLXdBk4lrUXSwXnHRncGwQOc88UpuE7t4aZ1XfuLZMEoCbTO2e
+UCzj3Q0IXwKBgGRzT9WXEKUILhSJt7um+Jyos4+Z/az/xcch1Gkixr3Y+T1Pv5aq
+vm7AApFyfnN+UVFOFC4euQeJdRwewfK+jlXCVJhtU1T/b9Sxz6NRf0GGZIymLPBS
+nlHQfRO/tXe1cyBtek13KRdGmakXraGHVJqYp41nbjwcTzd2Ra1/BVOBAoGAGfhU
+Q/eWU+c0YLf/qrHlzydCLD6MEFylXNb4TicUnldp5AdLCBVogw8Ew7Hro6wS1L+v
+nYopHak9oK+i/2YObmOXmDHxKgIoaP9leKHO2SHBk8p0worXx9bL7qRIap3jKugP
+9GGnAqWmXyQTNtOc96GOZnYWkwL31f+Gb89SOn0CgYBmI1EHZoGu/MDYRXq0n9b5
+hyF9Vzu0eqFEmrIHjrg8MpSwzbpPeMr3+exuPSFKP5wsD/DGoWpqn0vNacgmYZEN
+y2M2onU4JKUZPRJ6qCFGoa9hbwKcy97gjpVC7O/ZNeusxZJBFEOQbOqRWawwtqJo
+skVy6uKmdoAEl66jMuMlHg==
+-----END PRIVATE KEY-----""",
+                    "client_email": "firebase-adminsdk-fbsvc@ethopartshtml5.iam.gserviceaccount.com",
+                    "client_id": "115203612154037825922",
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40ethopartshtml5.iam.gserviceaccount.com",
+                    "universe_domain": "googleapis.com"
+                }
+                cred = credentials.Certificate(firebase_service_account)
+            firebase_admin.initialize_app(credential=cred, options={
+                'projectId': 'ethopartshtml5'
+            })
+            logger.info("Firebase initialized successfully")
+        except Exception as e:
+            logger.error(f"Firebase initialization failed: {str(e)}")
+            raise e
+    return firestore.client()
+
+db = get_db()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: seed data if not seeded
+    try:
+        users_ref = db.collection('users')
+        if len(list(users_ref.stream())) == 0:
+            logger.info("Seeding initial data...")
+            # Seed payment methods
+            payment_methods = [
+                {"id": str(uuid.uuid4()), "name": "Telebirr", "type": "mobile_money", "account_name": "Etho Parts", "account_number": "0777770757", "instructions": "Send money to the account number and upload receipt", "logo_url": "https://play-lh.googleusercontent.com/Wd2GI4hYd_4TdNjqTFVW0xqEUY5PmKv5YfPx2CpFo7vAQwRxuLcZGQ1EIQ7v7xVBcg=w240-h480-rw", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "CBE Birr", "type": "mobile_money", "account_name": "Etho Parts", "account_number": "1000123456789", "instructions": "Transfer to CBE Birr account", "logo_url": "https://play-lh.googleusercontent.com/7DkVqhvGxGK3qNAIwvYhKPHzHqQoH8rq2E_5jy5TRzp0lBZ_8eT4vYuV8dF9HUv2FA=w240-h480-rw", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "Amole", "type": "mobile_money", "account_name": "Etho Parts", "account_number": "0911223344", "instructions": "Send via Amole app", "logo_url": "https://play-lh.googleusercontent.com/mGAE8LVnP9hfPXR5jJ3yQ5hY9mQP8OqGJ0fvH7RdyJKE8SXPdXH7h1rNg4EVgzU=w240-h480-rw", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "M-Birr", "type": "mobile_money", "account_name": "Etho Parts", "account_number": "0922334455", "instructions": "Transfer via M-Birr", "logo_url": "https://play-lh.googleusercontent.com/V4KvQMGgE8RvGqhJx3bWEgGHkxFp4hFLUqGOFdGJG7OqNMp7wE9j7hSGQ2Z5FPvRvg=w240-h480-rw", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "HelloCash", "type": "mobile_money", "account_name": "Etho Parts", "account_number": "0933445566", "instructions": "Pay via HelloCash", "logo_url": "https://play-lh.googleusercontent.com/aOQRhXwvQKCvBJxhJxR7l_KJwA6qJlP7JhR5sYHl7qO8nG1PdD4xA6kQV8nJ4hLQqg=w240-h480-rw", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "Commercial Bank of Ethiopia (CBE)", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "1000987654321", "instructions": "Bank transfer to CBE account", "logo_url": "https://upload.wikimedia.org/wikipedia/en/thumb/a/a8/Commercial_Bank_of_Ethiopia_Logo.svg/200px-Commercial_Bank_of_Ethiopia_Logo.svg.png", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "Awash Bank", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "01234567890123", "instructions": "Transfer to Awash Bank account", "logo_url": "https://awashbank.com/wp-content/uploads/2021/04/awash-bank-logo.png", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "Dashen Bank", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "0123456789012", "instructions": "Transfer to Dashen Bank account", "logo_url": "https://dashenbank.com/wp-content/uploads/2020/01/dashen-bank-logo.png", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "Bank of Abyssinia", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "98765432101234", "instructions": "Transfer to BOA account", "logo_url": "https://www.bankofabyssinia.com/wp-content/uploads/2020/01/boa-logo.png", "enabled": True},
+                {"id": str(uuid.uuid4()), "name": "Wegagen Bank", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "0567891234567", "instructions": "Transfer to Wegagen Bank account", "logo_url": "https://wegagenbanksc.com/wp-content/uploads/2020/01/wegagen-logo.png", "enabled": True},
+            ]
+
+            for pm in payment_methods:
+                pm["created_at"] = datetime.now(timezone.utc).isoformat()
+                db.collection('payment_methods').document(pm["id"]).set(pm)
+
+            # Set default admin commission payment method (Telebirr)
+            db.collection('settings').document('commission_payment_method').set({
+                "key": "commission_payment_method",
+                "payment_method_id": payment_methods[0]["id"],
+                "account_name": "Etho Parts Admin",
+                "account_number": "0777770757",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            })
+
+            # Seed categories
+            categories = [
+                {"id": str(uuid.uuid4()), "name": "Engine Parts", "description": "Engine components and accessories", "icon": "engine"},
+                {"id": str(uuid.uuid4()), "name": "Brakes", "description": "Brake pads, rotors, and systems", "icon": "brake"},
+                {"id": str(uuid.uuid4()), "name": "Suspension", "description": "Shocks, struts, and springs", "icon": "suspension"},
+                {"id": str(uuid.uuid4()), "name": "Electrical", "description": "Batteries, alternators, starters", "icon": "electrical"},
+                {"id": str(uuid.uuid4()), "name": "Body Parts", "description": "Bumpers, doors, mirrors", "icon": "body"},
+                {"id": str(uuid.uuid4()), "name": "Filters", "description": "Air, oil, and fuel filters", "icon": "filter"},
+                {"id": str(uuid.uuid4()), "name": "Lighting", "description": "Headlights, taillights, bulbs", "icon": "light"},
+                {"id": str(uuid.uuid4()), "name": "Tires & Wheels", "description": "Tires, rims, and accessories", "icon": "tire"},
+            ]
+
+            for cat in categories:
+                db.collection('categories').document(cat["id"]).set(cat)
+
+            # Seed admin user
+            admin_user = {
+                "id": str(uuid.uuid4()),
+                "email": "admin@ethoparts.com",
+                "password": hash_password("admin123"),
+                "name": "Etho Parts Admin",
+                "phone": "0777770757",
+                "role": UserRole.ADMIN.value,
+                "business_name": "Etho Parts",
+                "address": "Addis Ababa, Ethiopia",
+                "enabled_payment_methods": [],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            db.collection('users').document(admin_user["id"]).set(admin_user)
+
+            # Seed seller user
+            seller_user = {
+                "id": str(uuid.uuid4()),
+                "email": "seller@ethoparts.com",
+                "password": hash_password("seller123"),
+                "name": "Auto Parts Dealer",
+                "phone": "0911223344",
+                "role": UserRole.SELLER.value,
+                "business_name": "Addis Auto Parts",
+                "address": "Merkato, Addis Ababa",
+                "enabled_payment_methods": [payment_methods[0]["id"], payment_methods[5]["id"]],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            db.collection('users').document(seller_user["id"]).set(seller_user)
+
+            # Add seller payment methods
+            seller_payment_methods = [
+                {
+                    "id": str(uuid.uuid4()),
+                    "seller_id": seller_user["id"],
+                    "payment_method_id": payment_methods[0]["id"],  # Telebirr
+                    "account_name": "Addis Auto Parts",
+                    "account_number": "0911223344",
+                    "enabled": True,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "seller_id": seller_user["id"],
+                    "payment_method_id": payment_methods[5]["id"],  # CBE
+                    "account_name": "Addis Auto Parts PLC",
+                    "account_number": "1000567891234",
+                    "enabled": True,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+            ]
+
+            for spm in seller_payment_methods:
+                db.collection('seller_payment_methods').document(spm["id"]).set(spm)
+
+            logger.info("Initial data seeded successfully")
+    except Exception as e:
+        logger.error(f"Error seeding data: {e}")
+
+    yield
+
+    # Shutdown
+    pass
 
 # JWT Settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'etho-parts-secret-key-2024')
@@ -39,6 +216,7 @@ security = HTTPBearer()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.info("Starting Etho Parts API server")
 
 # ======================== ENUMS ========================
 class UserRole(str, Enum):
@@ -77,7 +255,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
-    phone: str
+    phone: Optional[str] = None
     role: UserRole = UserRole.BUYER
     business_name: Optional[str] = None
     address: Optional[str] = None
@@ -90,7 +268,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: str
-    phone: str
+    phone: Optional[str] = None
     role: UserRole
     business_name: Optional[str] = None
     address: Optional[str] = None
@@ -250,9 +428,12 @@ def create_token(user_id: str, role: str) -> str:
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password": 0})
-        if not user:
+        user_doc = db.collection('users').document(payload["user_id"]).get()
+        if not user_doc.exists:
             raise HTTPException(status_code=401, detail="User not found")
+        user = user_doc.to_dict()
+        if 'password' in user:
+            del user['password']
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -262,12 +443,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # ======================== AUTH ROUTES ========================
 @api_router.post("/auth/register", response_model=dict)
 async def register(user_data: UserCreate):
-    existing = await db.users.find_one({"email": user_data.email})
-    if existing:
+    # Check if email already exists
+    users_ref = db.collection('users')
+    existing = users_ref.where('email', '==', user_data.email).limit(1).get()
+    if len(existing) > 0:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
+    user_id = str(uuid.uuid4())
     user_dict = {
-        "id": str(uuid.uuid4()),
+        "id": user_id,
         "email": user_data.email,
         "password": hash_password(user_data.password),
         "name": user_data.name,
@@ -278,18 +462,23 @@ async def register(user_data: UserCreate):
         "enabled_payment_methods": [],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.users.insert_one(user_dict)
+    db.collection('users').document(user_id).set(user_dict)
     token = create_token(user_dict["id"], user_dict["role"])
-    return {"token": token, "user": {k: v for k, v in user_dict.items() if k != "password" and k != "_id"}}
+    return {"token": token, "user": {k: v for k, v in user_dict.items() if k != "password"}}
 
 @api_router.post("/auth/login", response_model=dict)
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"email": credentials.email})
-    if not user or not verify_password(credentials.password, user["password"]):
+    users_ref = db.collection('users')
+    user_docs = users_ref.where('email', '==', credentials.email).limit(1).get()
+    if len(user_docs) == 0:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
+    user = user_docs[0].to_dict()
+    if not verify_password(credentials.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
     token = create_token(user["id"], user["role"])
-    return {"token": token, "user": {k: v for k, v in user.items() if k != "password" and k != "_id"}}
+    return {"token": token, "user": {k: v for k, v in user.items() if k != "password"}}
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(user: dict = Depends(get_current_user)):
@@ -299,8 +488,12 @@ async def get_me(user: dict = Depends(get_current_user)):
 @api_router.get("/payment-methods")
 async def get_payment_methods(enabled_only: bool = False):
     """Get all payment methods (public)"""
-    query = {"enabled": True} if enabled_only else {}
-    methods = await db.payment_methods.find(query, {"_id": 0}).to_list(100)
+    methods_ref = db.collection('payment_methods')
+    if enabled_only:
+        docs = methods_ref.where('enabled', '==', True).stream()
+    else:
+        docs = methods_ref.stream()
+    methods = [doc.to_dict() for doc in docs]
     return methods
 
 @api_router.get("/payment-methods/admin")
@@ -308,7 +501,7 @@ async def get_all_payment_methods(user: dict = Depends(get_current_user)):
     """Get all payment methods for admin"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    methods = await db.payment_methods.find({}, {"_id": 0}).to_list(100)
+    methods = [doc.to_dict() for doc in db.collection('payment_methods').stream()]
     return methods
 
 @api_router.post("/payment-methods")
@@ -316,7 +509,7 @@ async def create_payment_method(method: PaymentMethodCreate, user: dict = Depend
     """Admin creates a new payment method"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
+
     method_dict = {
         "id": str(uuid.uuid4()),
         "name": method.name,
@@ -328,33 +521,32 @@ async def create_payment_method(method: PaymentMethodCreate, user: dict = Depend
         "enabled": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.payment_methods.insert_one(method_dict)
-    return {k: v for k, v in method_dict.items() if k != "_id"}
+    db.collection('payment_methods').document(method_dict["id"]).set(method_dict)
+    return method_dict
 
 @api_router.put("/payment-methods/{method_id}")
 async def update_payment_method(method_id: str, update: PaymentMethodUpdate, user: dict = Depends(get_current_user)):
     """Admin updates a payment method"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    existing = await db.payment_methods.find_one({"id": method_id})
-    if not existing:
+
+    method_doc = db.collection('payment_methods').document(method_id)
+    if not method_doc.get().exists:
         raise HTTPException(status_code=404, detail="Payment method not found")
-    
+
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
-        await db.payment_methods.update_one({"id": method_id}, {"$set": update_data})
-    
-    updated = await db.payment_methods.find_one({"id": method_id}, {"_id": 0})
-    return updated
+        method_doc.update(update_data)
+
+    return method_doc.get().to_dict()
 
 @api_router.delete("/payment-methods/{method_id}")
 async def delete_payment_method(method_id: str, user: dict = Depends(get_current_user)):
     """Admin deletes a payment method"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    await db.payment_methods.delete_one({"id": method_id})
+
+    db.collection('payment_methods').document(method_id).delete()
     return {"message": "Payment method deleted"}
 
 @api_router.post("/payment-methods/{method_id}/toggle")
@@ -362,13 +554,14 @@ async def toggle_payment_method(method_id: str, user: dict = Depends(get_current
     """Admin toggles payment method enabled/disabled"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    method = await db.payment_methods.find_one({"id": method_id})
-    if not method:
+
+    method_doc = db.collection('payment_methods').document(method_id)
+    method_data = method_doc.get().to_dict()
+    if not method_data:
         raise HTTPException(status_code=404, detail="Payment method not found")
-    
-    new_status = not method.get("enabled", True)
-    await db.payment_methods.update_one({"id": method_id}, {"$set": {"enabled": new_status}})
+
+    new_status = not method_data.get("enabled", True)
+    method_doc.update({"enabled": new_status})
     return {"enabled": new_status}
 
 # ======================== SELLER PAYMENT METHOD ROUTES ========================
@@ -377,19 +570,19 @@ async def get_seller_payment_methods(user: dict = Depends(get_current_user)):
     """Get seller's enabled payment methods"""
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Sellers only")
-    
-    seller_methods = await db.seller_payment_methods.find(
-        {"seller_id": user["id"]}, {"_id": 0}
-    ).to_list(100)
-    
+
+    seller_methods_ref = db.collection('seller_payment_methods').where('seller_id', '==', user["id"]).limit(100)
+    seller_methods = [doc.to_dict() for doc in seller_methods_ref.stream()]
+
     # Enrich with payment method details
     for sm in seller_methods:
-        method = await db.payment_methods.find_one({"id": sm["payment_method_id"]}, {"_id": 0})
-        if method:
+        method_doc = db.collection('payment_methods').document(sm["payment_method_id"]).get()
+        if method_doc.exists:
+            method = method_doc.to_dict()
             sm["method_name"] = method["name"]
             sm["method_type"] = method["type"]
             sm["method_logo"] = method.get("logo_url")
-    
+
     return seller_methods
 
 @api_router.post("/seller/payment-methods")
@@ -397,20 +590,18 @@ async def add_seller_payment_method(data: SellerPaymentMethodCreate, user: dict 
     """Seller adds a payment method with their account details"""
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Sellers only")
-    
+
     # Check if payment method is enabled by admin
-    method = await db.payment_methods.find_one({"id": data.payment_method_id, "enabled": True})
-    if not method:
+    method_doc = db.collection('payment_methods').document(data.payment_method_id).get()
+    if not method_doc.exists or not method_doc.to_dict().get("enabled", False):
         raise HTTPException(status_code=400, detail="Payment method not available")
-    
+
     # Check if seller already has this method
-    existing = await db.seller_payment_methods.find_one({
-        "seller_id": user["id"],
-        "payment_method_id": data.payment_method_id
-    })
+    existing_docs = db.collection('seller_payment_methods').where('seller_id', '==', user["id"]).where('payment_method_id', '==', data.payment_method_id).limit(1).stream()
+    existing = next(existing_docs, None)
     if existing:
         raise HTTPException(status_code=400, detail="Payment method already added")
-    
+
     seller_method = {
         "id": str(uuid.uuid4()),
         "seller_id": user["id"],
@@ -420,79 +611,94 @@ async def add_seller_payment_method(data: SellerPaymentMethodCreate, user: dict 
         "enabled": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.seller_payment_methods.insert_one(seller_method)
-    
+    db.collection('seller_payment_methods').document(seller_method["id"]).set(seller_method)
+
     # Update user's enabled payment methods list
-    await db.users.update_one(
-        {"id": user["id"]},
-        {"$addToSet": {"enabled_payment_methods": data.payment_method_id}}
-    )
-    
-    return {k: v for k, v in seller_method.items() if k != "_id"}
+    user_doc = db.collection('users').document(user["id"]).get()
+    if user_doc.exists:
+        user_data = user_doc.to_dict()
+        enabled_methods = user_data.get("enabled_payment_methods", [])
+        if data.payment_method_id not in enabled_methods:
+            enabled_methods.append(data.payment_method_id)
+            db.collection('users').document(user["id"]).update({"enabled_payment_methods": enabled_methods})
+
+    return seller_method
 
 @api_router.delete("/seller/payment-methods/{method_id}")
 async def remove_seller_payment_method(method_id: str, user: dict = Depends(get_current_user)):
     """Seller removes a payment method"""
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Sellers only")
-    
-    seller_method = await db.seller_payment_methods.find_one({"id": method_id, "seller_id": user["id"]})
-    if not seller_method:
+
+    seller_method_doc = db.collection('seller_payment_methods').document(method_id).get()
+    if not seller_method_doc.exists:
         raise HTTPException(status_code=404, detail="Payment method not found")
-    
-    await db.seller_payment_methods.delete_one({"id": method_id})
-    
+    seller_method = seller_method_doc.to_dict()
+
+    if seller_method["seller_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    db.collection('seller_payment_methods').document(method_id).delete()
+
     # Update user's enabled payment methods list
-    await db.users.update_one(
-        {"id": user["id"]},
-        {"$pull": {"enabled_payment_methods": seller_method["payment_method_id"]}}
-    )
-    
+    user_doc = db.collection('users').document(user["id"]).get()
+    if user_doc.exists:
+        user_data = user_doc.to_dict()
+        enabled_methods = user_data.get("enabled_payment_methods", [])
+        if seller_method["payment_method_id"] in enabled_methods:
+            enabled_methods.remove(seller_method["payment_method_id"])
+            db.collection('users').document(user["id"]).update({"enabled_payment_methods": enabled_methods})
+
     return {"message": "Payment method removed"}
 
 @api_router.get("/seller/{seller_id}/payment-methods")
 async def get_seller_available_payment_methods(seller_id: str):
     """Get available payment methods for a specific seller (for buyers)"""
-    seller_methods = await db.seller_payment_methods.find(
-        {"seller_id": seller_id, "enabled": True}, {"_id": 0}
-    ).to_list(100)
-    
+    seller_methods_ref = db.collection('seller_payment_methods').where('seller_id', '==', seller_id).where('enabled', '==', True).limit(100)
+    seller_methods = [doc.to_dict() for doc in seller_methods_ref.stream()]
+
     result = []
     for sm in seller_methods:
-        method = await db.payment_methods.find_one({"id": sm["payment_method_id"], "enabled": True}, {"_id": 0})
-        if method:
-            result.append({
-                "id": sm["id"],
-                "payment_method_id": method["id"],
-                "name": method["name"],
-                "type": method["type"],
-                "logo_url": method.get("logo_url"),
-                "account_name": sm["account_name"],
-                "account_number": sm["account_number"],
-                "instructions": method.get("instructions")
-            })
-    
+        method_doc = db.collection('payment_methods').document(sm["payment_method_id"]).get()
+        if method_doc.exists:
+            method = method_doc.to_dict()
+            if method.get("enabled", False):
+                result.append({
+                    "id": sm["id"],
+                    "payment_method_id": method["id"],
+                    "name": method["name"],
+                    "type": method["type"],
+                    "logo_url": method.get("logo_url"),
+                    "account_name": sm["account_name"],
+                    "account_number": sm["account_number"],
+                    "instructions": method.get("instructions")
+                })
+
     return result
 
 # ======================== CATEGORY ROUTES ========================
 @api_router.get("/categories", response_model=List[CategoryResponse])
 async def get_categories():
-    categories = await db.categories.find({}, {"_id": 0}).to_list(100)
+    categories = []
+    docs = db.collection('categories').stream()
+    for doc in docs:
+        categories.append(doc.to_dict())
     return categories
 
 @api_router.post("/categories", response_model=CategoryResponse)
 async def create_category(category: CategoryCreate, user: dict = Depends(get_current_user)):
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
+
+    cat_id = str(uuid.uuid4())
     cat_dict = {
-        "id": str(uuid.uuid4()),
+        "id": cat_id,
         "name": category.name,
         "description": category.description,
         "icon": category.icon
     }
-    await db.categories.insert_one(cat_dict)
-    return {k: v for k, v in cat_dict.items() if k != "_id"}
+    db.collection('categories').document(cat_id).set(cat_dict)
+    return cat_dict
 
 # ======================== PRODUCT ROUTES ========================
 @api_router.get("/products", response_model=List[ProductResponse])
@@ -507,58 +713,74 @@ async def get_products(
     skip: int = 0,
     limit: int = 50
 ):
-    query = {}
+    products_ref = db.collection('products')
+
+    # Apply filters
+    query = products_ref
     if category_id:
-        query["category_id"] = category_id
-    if brand:
-        query["brand"] = {"$regex": brand, "$options": "i"}
+        query = query.where('category_id', '==', category_id)
     if condition:
-        query["condition"] = condition.value
-    if min_price is not None:
-        query["price"] = {"$gte": min_price}
-    if max_price is not None:
-        query.setdefault("price", {})["$lte"] = max_price
-    if search:
-        query["$or"] = [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}},
-            {"brand": {"$regex": search, "$options": "i"}}
-        ]
+        query = query.where('condition', '==', condition.value)
     if seller_id:
-        query["seller_id"] = seller_id
-    
-    products = await db.products.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
-    
-    for product in products:
-        category = await db.categories.find_one({"id": product["category_id"]}, {"_id": 0})
-        if category:
-            product["category_name"] = category["name"]
-        seller = await db.users.find_one({"id": product["seller_id"]}, {"_id": 0})
-        if seller:
-            product["seller_name"] = seller.get("business_name") or seller["name"]
-    
+        query = query.where('seller_id', '==', seller_id)
+
+    # Get documents
+    docs = query.offset(skip).limit(limit).stream()
+    products = []
+
+    for doc in docs:
+        product = doc.to_dict()
+        # Apply additional filters that Firestore doesn't support natively
+        if brand and brand.lower() not in product.get('brand', '').lower():
+            continue
+        if min_price is not None and product.get('price', 0) < min_price:
+            continue
+        if max_price is not None and product.get('price', 0) > max_price:
+            continue
+        if search:
+            search_term = search.lower()
+            if not (search_term in product.get('name', '').lower() or
+                    search_term in product.get('description', '').lower() or
+                    search_term in product.get('brand', '').lower()):
+                continue
+
+        # Add category and seller info
+        category_doc = db.collection('categories').document(product["category_id"]).get()
+        if category_doc.exists:
+            product["category_name"] = category_doc.to_dict()["name"]
+
+        seller_doc = db.collection('users').document(product["seller_id"]).get()
+        if seller_doc.exists:
+            seller_data = seller_doc.to_dict()
+            product["seller_name"] = seller_data.get("business_name") or seller_data["name"]
+
+        products.append(product)
+
     return products
 
 @api_router.get("/products/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: str):
-    product = await db.products.find_one({"id": product_id}, {"_id": 0})
-    if not product:
+    product_doc = db.collection('products').document(product_id).get()
+    if not product_doc.exists:
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    category = await db.categories.find_one({"id": product["category_id"]}, {"_id": 0})
-    if category:
-        product["category_name"] = category["name"]
-    seller = await db.users.find_one({"id": product["seller_id"]}, {"_id": 0})
-    if seller:
-        product["seller_name"] = seller.get("business_name") or seller["name"]
-    
+
+    product = product_doc.to_dict()
+
+    category_doc = db.collection('categories').document(product["category_id"]).get()
+    if category_doc.exists:
+        product["category_name"] = category_doc.to_dict()["name"]
+    seller_doc = db.collection('users').document(product["seller_id"]).get()
+    if seller_doc.exists:
+        seller_data = seller_doc.to_dict()
+        product["seller_name"] = seller_data.get("business_name") or seller_data["name"]
+
     return product
 
 @api_router.post("/products", response_model=ProductResponse)
 async def create_product(product: ProductCreate, user: dict = Depends(get_current_user)):
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Sellers only")
-    
+
     product_dict = {
         "id": str(uuid.uuid4()),
         "name": product.name,
@@ -576,57 +798,64 @@ async def create_product(product: ProductCreate, user: dict = Depends(get_curren
         "review_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.products.insert_one(product_dict)
+    db.collection('products').document(product_dict["id"]).set(product_dict)
     product_dict["seller_name"] = user.get("business_name") or user["name"]
-    return {k: v for k, v in product_dict.items() if k != "_id"}
+    return product_dict
 
 @api_router.put("/products/{product_id}", response_model=ProductResponse)
 async def update_product(product_id: str, product_update: ProductUpdate, user: dict = Depends(get_current_user)):
-    existing = await db.products.find_one({"id": product_id}, {"_id": 0})
-    if not existing:
+    existing_doc = db.collection('products').document(product_id).get()
+    if not existing_doc.exists:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
+    existing = existing_doc.to_dict()
+
     if existing["seller_id"] != user["id"] and user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     update_data = {k: v for k, v in product_update.model_dump().items() if v is not None}
     if "condition" in update_data:
         update_data["condition"] = update_data["condition"].value
-    
+
     if update_data:
-        await db.products.update_one({"id": product_id}, {"$set": update_data})
-    
-    updated = await db.products.find_one({"id": product_id}, {"_id": 0})
+        db.collection('products').document(product_id).update(update_data)
+
+    updated_doc = db.collection('products').document(product_id).get()
+    updated = updated_doc.to_dict()
     return updated
 
 @api_router.delete("/products/{product_id}")
 async def delete_product(product_id: str, user: dict = Depends(get_current_user)):
-    existing = await db.products.find_one({"id": product_id}, {"_id": 0})
-    if not existing:
+    existing_doc = db.collection('products').document(product_id).get()
+    if not existing_doc.exists:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
+    existing = existing_doc.to_dict()
+
     if existing["seller_id"] != user["id"] and user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    await db.products.delete_one({"id": product_id})
+
+    db.collection('products').document(product_id).delete()
     return {"message": "Product deleted"}
 
 # ======================== REVIEW ROUTES ========================
 @api_router.get("/products/{product_id}/reviews", response_model=List[ReviewResponse])
 async def get_reviews(product_id: str):
-    reviews = await db.reviews.find({"product_id": product_id}, {"_id": 0}).to_list(100)
+    reviews_ref = db.collection('reviews').where('product_id', '==', product_id).limit(100)
+    reviews = [doc.to_dict() for doc in reviews_ref.stream()]
     return reviews
 
 @api_router.post("/products/{product_id}/reviews", response_model=ReviewResponse)
 async def create_review(product_id: str, review: ReviewCreate, user: dict = Depends(get_current_user)):
-    product = await db.products.find_one({"id": product_id})
-    if not product:
+    product_doc = db.collection('products').document(product_id).get()
+    if not product_doc.exists:
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    existing_review = await db.reviews.find_one({"product_id": product_id, "user_id": user["id"]})
+
+    existing_docs = db.collection('reviews').where('product_id', '==', product_id).where('user_id', '==', user["id"]).limit(1).stream()
+    existing_review = next(existing_docs, None)
     if existing_review:
         raise HTTPException(status_code=400, detail="You already reviewed this product")
-    
+
     review_dict = {
         "id": str(uuid.uuid4()),
         "product_id": product_id,
@@ -636,16 +865,17 @@ async def create_review(product_id: str, review: ReviewCreate, user: dict = Depe
         "comment": review.comment,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.reviews.insert_one(review_dict)
-    
-    all_reviews = await db.reviews.find({"product_id": product_id}, {"_id": 0}).to_list(1000)
+    db.collection('reviews').document(review_dict["id"]).set(review_dict)
+
+    all_reviews_docs = db.collection('reviews').where('product_id', '==', product_id).stream()
+    all_reviews = [doc.to_dict() for doc in all_reviews_docs]
     avg_rating = sum(r["rating"] for r in all_reviews) / len(all_reviews)
-    await db.products.update_one(
-        {"id": product_id},
-        {"$set": {"avg_rating": round(avg_rating, 1), "review_count": len(all_reviews)}}
-    )
-    
-    return {k: v for k, v in review_dict.items() if k != "_id"}
+    db.collection('products').document(product_id).update({
+        "avg_rating": round(avg_rating, 1),
+        "review_count": len(all_reviews)
+    })
+
+    return review_dict
 
 # ======================== ORDER ROUTES ========================
 @api_router.post("/orders")
@@ -655,12 +885,13 @@ async def create_order(order_data: OrderCreate, user: dict = Depends(get_current
     sellers = set()
     
     for item in order_data.items:
-        product = await db.products.find_one({"id": item.product_id}, {"_id": 0})
-        if not product:
+        product_doc = db.collection('products').document(item.product_id).get()
+        if not product_doc.exists:
             raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found")
+        product = product_doc.to_dict()
         if product["stock"] < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for {product['name']}")
-        
+
         item_total = product["price"] * item.quantity
         total_amount += item_total
         sellers.add(product["seller_id"])
@@ -672,13 +903,15 @@ async def create_order(order_data: OrderCreate, user: dict = Depends(get_current
             "total": item_total,
             "seller_id": product["seller_id"]
         })
-    
+
     # Validate payment method
-    seller_method = await db.seller_payment_methods.find_one({"id": order_data.payment_method_id})
-    if not seller_method:
+    seller_method_doc = db.collection('seller_payment_methods').document(order_data.payment_method_id).get()
+    if not seller_method_doc.exists:
         raise HTTPException(status_code=400, detail="Invalid payment method")
-    
-    payment_method = await db.payment_methods.find_one({"id": seller_method["payment_method_id"]}, {"_id": 0})
+    seller_method = seller_method_doc.to_dict()
+
+    payment_method_doc = db.collection('payment_methods').document(seller_method["payment_method_id"]).get()
+    payment_method = payment_method_doc.to_dict() if payment_method_doc.exists else None
     
     commission_amount = round(total_amount * COMMISSION_RATE, 2)
     order_number = f"EP-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
@@ -707,49 +940,81 @@ async def create_order(order_data: OrderCreate, user: dict = Depends(get_current
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
-    
-    await db.orders.insert_one(order_dict)
-    
+
+    db.collection('orders').document(order_dict["id"]).set(order_dict)
+
     # Update stock
     for item in order_data.items:
-        await db.products.update_one(
-            {"id": item.product_id},
-            {"$inc": {"stock": -item.quantity}}
-        )
-    
-    return {k: v for k, v in order_dict.items() if k != "_id"}
+        db.collection('products').document(item.product_id).update({
+            "stock": firestore.Increment(-item.quantity)
+        })
+
+    return order_dict
 
 @api_router.get("/orders")
 async def get_orders(user: dict = Depends(get_current_user)):
     if user["role"] == UserRole.ADMIN.value:
-        orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        orders_ref = db.collection('orders').order_by('created_at', direction=firestore.Query.DESCENDING).limit(1000)
+        orders = [doc.to_dict() for doc in orders_ref.stream()]
     elif user["role"] == UserRole.SELLER.value:
-        orders = await db.orders.find({"items.seller_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        # Optimize seller order retrieval by using batched queries
+        # Get recent orders in batches and filter for seller items
+        orders = []
+        last_doc = None
+        batch_size = 50
+
+        while len(orders) < 500:  # Limit total results
+            query = db.collection('orders').order_by('created_at', direction=firestore.Query.DESCENDING).limit(batch_size)
+            if last_doc:
+                query = query.start_after(last_doc)
+
+            batch = [doc.to_dict() for doc in query.stream()]
+            if not batch:
+                break
+
+            # Filter orders that contain seller's items
+            seller_orders = [o for o in batch if any(item.get('seller_id') == user["id"] for item in o.get('items', []))]
+            orders.extend(seller_orders)
+
+            if len(batch) < batch_size:
+                break
+
+            last_doc = batch[-1]['created_at']
+
+        # Sort orders by creation date (most recent first)
+        orders.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        orders = orders[:500]  # Ensure we don't return more than 500
     else:
-        orders = await db.orders.find({"buyer_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        orders_ref = db.collection('orders').where('buyer_id', '==', user["id"]).order_by('created_at', direction=firestore.Query.DESCENDING).limit(1000)
+        orders = [doc.to_dict() for doc in orders_ref.stream()]
     return orders
 
 @api_router.get("/orders/{order_id}")
 async def get_order(order_id: str, user: dict = Depends(get_current_user)):
-    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
+    order_doc = db.collection('orders').document(order_id).get()
+    if not order_doc.exists:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
+    order = order_doc.to_dict()
+
     if user["role"] == UserRole.BUYER.value and order["buyer_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized")
     if user["role"] == UserRole.SELLER.value:
         seller_items = [i for i in order["items"] if i["seller_id"] == user["id"]]
         if not seller_items:
             raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     return order
 
 @api_router.get("/orders/track/{order_number}")
 async def track_order(order_number: str):
-    order = await db.orders.find_one({"order_number": order_number}, {"_id": 0})
-    if not order:
+    orders_ref = db.collection('orders').where('order_number', '==', order_number).limit(1)
+    orders = [doc.to_dict() for doc in orders_ref.stream()]
+    if not orders:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
+    order = orders[0]
+
     return {
         "order_number": order["order_number"],
         "order_status": order["order_status"],
@@ -762,41 +1027,44 @@ async def track_order(order_number: str):
 async def update_order_status(order_id: str, status_update: OrderStatusUpdate, user: dict = Depends(get_current_user)):
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
+
+    order_doc = db.collection('orders').document(order_id).get()
+    if not order_doc.exists:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
+    order = order_doc.to_dict()
+
     tracking_entry = {
         "status": status_update.status.value,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "note": status_update.note or f"Status updated to {status_update.status.value}"
     }
-    
-    await db.orders.update_one(
-        {"id": order_id},
-        {
-            "$set": {
-                "order_status": status_update.status.value,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            },
-            "$push": {"tracking_info": tracking_entry}
-        }
-    )
-    
+
+    # Get current tracking_info
+    current_tracking = order.get('tracking_info', [])
+    current_tracking.append(tracking_entry)
+
+    db.collection('orders').document(order_id).update({
+        "order_status": status_update.status.value,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "tracking_info": current_tracking
+    })
+
     return {"message": "Status updated", "status": status_update.status.value}
 
 # ======================== PAYMENT & RECEIPT ROUTES ========================
 @api_router.post("/payments/upload-receipt")
 async def upload_receipt(verification: PaymentVerification, user: dict = Depends(get_current_user)):
     """Buyer uploads payment receipt"""
-    order = await db.orders.find_one({"id": verification.order_id}, {"_id": 0})
-    if not order:
+    order_doc = db.collection('orders').document(verification.order_id).get()
+    if not order_doc.exists:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
+    order = order_doc.to_dict()
+
     if order["buyer_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     payment_record = {
         "id": str(uuid.uuid4()),
         "order_id": verification.order_id,
@@ -806,49 +1074,53 @@ async def upload_receipt(verification: PaymentVerification, user: dict = Depends
         "status": "pending_review",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.payments.insert_one(payment_record)
-    
-    await db.orders.update_one(
-        {"id": verification.order_id},
-        {
-            "$set": {
-                "payment_status": PaymentStatus.PENDING_VERIFICATION.value,
-                "receipt_url": verification.receipt_image,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            },
-            "$push": {"tracking_info": {
-                "status": "Receipt Uploaded",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "note": f"Payment receipt uploaded. Reference: {verification.transaction_ref}"
-            }}
-        }
-    )
-    
+    db.collection('payments').document(payment_record["id"]).set(payment_record)
+
+    # Get current tracking_info
+    current_tracking = order.get('tracking_info', [])
+    current_tracking.append({
+        "status": "Receipt Uploaded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "note": f"Payment receipt uploaded. Reference: {verification.transaction_ref}"
+    })
+
+    db.collection('orders').document(verification.order_id).update({
+        "payment_status": PaymentStatus.PENDING_VERIFICATION.value,
+        "receipt_url": verification.receipt_image,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "tracking_info": current_tracking
+    })
+
     return {"message": "Receipt uploaded successfully", "payment_id": payment_record["id"]}
 
 @api_router.get("/payments/pending")
 async def get_pending_payments(user: dict = Depends(get_current_user)):
     """Get pending payment verifications"""
     if user["role"] == UserRole.ADMIN.value:
-        payments = await db.payments.find({"status": "pending_review"}, {"_id": 0}).to_list(100)
+        payments_ref = db.collection('payments').where('status', '==', 'pending_review').order_by('created_at', direction=firestore.Query.DESCENDING).limit(100)
+        payments = [doc.to_dict() for doc in payments_ref.stream()]
     elif user["role"] == UserRole.SELLER.value:
-        # Get seller's orders first
-        seller_orders = await db.orders.find({"items.seller_id": user["id"]}, {"_id": 0, "id": 1}).to_list(1000)
-        order_ids = [o["id"] for o in seller_orders]
-        payments = await db.payments.find(
-            {"status": "pending_review", "order_id": {"$in": order_ids}}, {"_id": 0}
-        ).to_list(100)
+        # Get pending payments and filter for seller's orders using batched approach
+        payments = []
+        payments_ref = db.collection('payments').where('status', '==', 'pending_review').order_by('created_at', direction=firestore.Query.DESCENDING).limit(200)
+        all_payments = [doc.to_dict() for doc in payments_ref.stream()]
+
+        # Check each payment's order to see if seller has items in it
+        for payment in all_payments:
+            order_doc = db.collection('orders').document(payment["order_id"]).get()
+            if order_doc.exists:
+                order = order_doc.to_dict()
+                if any(item.get('seller_id') == user["id"] for item in order.get('items', [])):
+                    payment["order_number"] = order["order_number"]
+                    payment["total_amount"] = order["total_amount"]
+                    payment["payment_method_name"] = order.get("payment_method_name")
+                    payments.append(payment)
+
+            if len(payments) >= 50:  # Limit results
+                break
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    # Enrich with order details
-    for p in payments:
-        order = await db.orders.find_one({"id": p["order_id"]}, {"_id": 0})
-        if order:
-            p["order_number"] = order["order_number"]
-            p["total_amount"] = order["total_amount"]
-            p["payment_method_name"] = order.get("payment_method_name")
-    
+
     return payments
 
 @api_router.post("/payments/{payment_id}/confirm")
@@ -856,45 +1128,46 @@ async def confirm_payment(payment_id: str, user: dict = Depends(get_current_user
     """Admin or Seller confirms a payment"""
     if user["role"] not in [UserRole.ADMIN.value, UserRole.SELLER.value]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
-    if not payment:
+
+    payment_doc = db.collection('payments').document(payment_id).get()
+    if not payment_doc.exists:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
-    order = await db.orders.find_one({"id": payment["order_id"]}, {"_id": 0})
-    if not order:
+    payment = payment_doc.to_dict()
+
+    order_doc = db.collection('orders').document(payment["order_id"]).get()
+    if not order_doc.exists:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+    order = order_doc.to_dict()
+
     # If seller, verify they own this order
     if user["role"] == UserRole.SELLER.value:
         seller_items = [i for i in order["items"] if i["seller_id"] == user["id"]]
         if not seller_items:
             raise HTTPException(status_code=403, detail="Not authorized")
-    
-    await db.payments.update_one({"id": payment_id}, {"$set": {"status": "confirmed"}})
-    
-    await db.orders.update_one(
-        {"id": payment["order_id"]},
-        {
-            "$set": {
-                "payment_status": PaymentStatus.COMPLETED.value,
-                "order_status": OrderStatus.CONFIRMED.value,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            },
-            "$push": {"tracking_info": {
-                "status": "Payment Confirmed",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "note": "Payment has been verified and confirmed"
-            }}
-        }
-    )
-    
+
+    db.collection('payments').document(payment_id).update({"status": "confirmed"})
+
+    # Get current tracking_info
+    current_tracking = order.get('tracking_info', [])
+    current_tracking.append({
+        "status": "Payment Confirmed",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "note": "Payment has been verified and confirmed"
+    })
+
+    db.collection('orders').document(payment["order_id"]).update({
+        "payment_status": PaymentStatus.COMPLETED.value,
+        "order_status": OrderStatus.CONFIRMED.value,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "tracking_info": current_tracking
+    })
+
     # Create commission record for the seller
     for seller_id in set(item["seller_id"] for item in order["items"]):
         seller_total = sum(item["total"] for item in order["items"] if item["seller_id"] == seller_id)
         commission_amount = round(seller_total * COMMISSION_RATE, 2)
         due_date = datetime.now(timezone.utc) + timedelta(hours=COMMISSION_DUE_HOURS)
-        
+
         commission_record = {
             "id": str(uuid.uuid4()),
             "order_id": order["id"],
@@ -907,8 +1180,8 @@ async def confirm_payment(payment_id: str, user: dict = Depends(get_current_user
             "due_date": due_date.isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        await db.commissions.insert_one(commission_record)
-    
+        db.collection('commissions').document(commission_record["id"]).set(commission_record)
+
     return {"message": "Payment confirmed"}
 
 @api_router.post("/payments/{payment_id}/reject")
@@ -916,24 +1189,30 @@ async def reject_payment(payment_id: str, user: dict = Depends(get_current_user)
     """Admin or Seller rejects a payment"""
     if user["role"] not in [UserRole.ADMIN.value, UserRole.SELLER.value]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    payment = await db.payments.find_one({"id": payment_id})
-    if not payment:
+
+    payment_doc = db.collection('payments').document(payment_id).get()
+    if not payment_doc.exists:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
-    await db.payments.update_one({"id": payment_id}, {"$set": {"status": "rejected"}})
-    await db.orders.update_one(
-        {"id": payment["order_id"]},
-        {
-            "$set": {"payment_status": PaymentStatus.FAILED.value},
-            "$push": {"tracking_info": {
-                "status": "Payment Rejected",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "note": "Payment verification failed. Please upload a valid receipt."
-            }}
-        }
-    )
-    
+    payment = payment_doc.to_dict()
+
+    db.collection('payments').document(payment_id).update({"status": "rejected"})
+
+    # Get current tracking_info for the order
+    order_doc = db.collection('orders').document(payment["order_id"]).get()
+    if order_doc.exists:
+        order = order_doc.to_dict()
+        current_tracking = order.get('tracking_info', [])
+        current_tracking.append({
+            "status": "Payment Rejected",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "note": "Payment verification failed. Please upload a valid receipt."
+        })
+
+        db.collection('orders').document(payment["order_id"]).update({
+            "payment_status": PaymentStatus.FAILED.value,
+            "tracking_info": current_tracking
+        })
+
     return {"message": "Payment rejected"}
 
 # ======================== COMMISSION ROUTES ========================
@@ -941,14 +1220,14 @@ async def reject_payment(payment_id: str, user: dict = Depends(get_current_user)
 async def get_commissions(user: dict = Depends(get_current_user)):
     """Get commissions - sellers see their own, admin sees all"""
     if user["role"] == UserRole.ADMIN.value:
-        commissions = await db.commissions.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        commissions_ref = db.collection('commissions').order_by('created_at', direction=firestore.Query.DESCENDING).limit(1000)
+        commissions = [doc.to_dict() for doc in commissions_ref.stream()]
     elif user["role"] == UserRole.SELLER.value:
-        commissions = await db.commissions.find(
-            {"seller_id": user["id"]}, {"_id": 0}
-        ).sort("created_at", -1).to_list(1000)
+        commissions_ref = db.collection('commissions').where('seller_id', '==', user["id"]).order_by('created_at', direction=firestore.Query.DESCENDING).limit(1000)
+        commissions = [doc.to_dict() for doc in commissions_ref.stream()]
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     # Update overdue status
     now = datetime.now(timezone.utc)
     for c in commissions:
@@ -956,11 +1235,8 @@ async def get_commissions(user: dict = Depends(get_current_user)):
             due_date = datetime.fromisoformat(c["due_date"].replace("Z", "+00:00"))
             if now > due_date:
                 c["status"] = CommissionStatus.OVERDUE.value
-                await db.commissions.update_one(
-                    {"id": c["id"]},
-                    {"$set": {"status": CommissionStatus.OVERDUE.value}}
-                )
-    
+                db.collection('commissions').document(c["id"]).update({"status": CommissionStatus.OVERDUE.value})
+
     return commissions
 
 @api_router.get("/commissions/stats")
@@ -969,11 +1245,11 @@ async def get_commission_stats(user: dict = Depends(get_current_user)):
     if user["role"] == UserRole.ADMIN.value:
         total_earned = 0
         pending_amount = 0
-        commissions = await db.commissions.find({}, {"_id": 0}).to_list(10000)
+        commissions = [doc.to_dict() for doc in db.collection('commissions').stream()]
         for c in commissions:
             if c["status"] == CommissionStatus.PAID.value:
                 total_earned += c["commission_amount"]
-            elif c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value]:
+            elif c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value, CommissionStatus.PENDING_VERIFICATION.value]:
                 pending_amount += c["commission_amount"]
         return {
             "total_earned": total_earned,
@@ -983,11 +1259,11 @@ async def get_commission_stats(user: dict = Depends(get_current_user)):
     elif user["role"] == UserRole.SELLER.value:
         total_owed = 0
         paid_amount = 0
-        commissions = await db.commissions.find({"seller_id": user["id"]}, {"_id": 0}).to_list(10000)
+        commissions = [doc.to_dict() for doc in db.collection('commissions').where('seller_id', '==', user["id"]).stream()]
         for c in commissions:
             if c["status"] == CommissionStatus.PAID.value:
                 paid_amount += c["commission_amount"]
-            elif c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value]:
+            elif c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value, CommissionStatus.PENDING_VERIFICATION.value]:
                 total_owed += c["commission_amount"]
         return {
             "total_owed": total_owed,
@@ -1002,14 +1278,15 @@ async def pay_commission(commission_id: str, payment: CommissionPayment, user: d
     """Seller submits commission payment"""
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    commission = await db.commissions.find_one({"id": commission_id}, {"_id": 0})
-    if not commission:
+
+    commission_doc = db.collection('commissions').document(commission_id).get()
+    if not commission_doc.exists:
         raise HTTPException(status_code=404, detail="Commission not found")
-    
+    commission = commission_doc.to_dict()
+
     if user["role"] == UserRole.SELLER.value and commission["seller_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     # Create commission payment record
     commission_payment = {
         "id": str(uuid.uuid4()),
@@ -1021,13 +1298,10 @@ async def pay_commission(commission_id: str, payment: CommissionPayment, user: d
         "status": "pending_review",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.commission_payments.insert_one(commission_payment)
-    
-    await db.commissions.update_one(
-        {"id": commission_id},
-        {"$set": {"status": CommissionStatus.PENDING_VERIFICATION.value}}
-    )
-    
+    db.collection('commission_payments').document(commission_payment["id"]).set(commission_payment)
+
+    db.collection('commissions').document(commission_id).update({"status": CommissionStatus.PENDING_VERIFICATION.value})
+
     return {"message": "Commission payment submitted", "payment_id": commission_payment["id"]}
 
 @api_router.get("/commissions/payments/pending")
@@ -1035,18 +1309,20 @@ async def get_pending_commission_payments(user: dict = Depends(get_current_user)
     """Admin gets pending commission payments"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    payments = await db.commission_payments.find({"status": "pending_review"}, {"_id": 0}).to_list(100)
-    
+
+    payments = [doc.to_dict() for doc in db.collection('commission_payments').where('status', '==', 'pending_review').limit(100).stream()]
+
     for p in payments:
-        commission = await db.commissions.find_one({"id": p["commission_id"]}, {"_id": 0})
-        if commission:
+        commission_doc = db.collection('commissions').document(p["commission_id"]).get()
+        if commission_doc.exists:
+            commission = commission_doc.to_dict()
             p["order_number"] = commission["order_number"]
             p["commission_amount"] = commission["commission_amount"]
-        seller = await db.users.find_one({"id": p["seller_id"]}, {"_id": 0, "password": 0})
-        if seller:
+        seller_doc = db.collection('users').document(p["seller_id"]).get()
+        if seller_doc.exists:
+            seller = seller_doc.to_dict()
             p["seller_name"] = seller.get("business_name") or seller["name"]
-    
+
     return payments
 
 @api_router.post("/commissions/payments/{payment_id}/confirm")
@@ -1054,17 +1330,18 @@ async def confirm_commission_payment(payment_id: str, user: dict = Depends(get_c
     """Admin confirms commission payment"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    payment = await db.commission_payments.find_one({"id": payment_id})
-    if not payment:
+
+    payment_doc = db.collection('commission_payments').document(payment_id).get()
+    if not payment_doc.exists:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
-    await db.commission_payments.update_one({"id": payment_id}, {"$set": {"status": "confirmed"}})
-    await db.commissions.update_one(
-        {"id": payment["commission_id"]},
-        {"$set": {"status": CommissionStatus.PAID.value, "paid_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    
+    payment = payment_doc.to_dict()
+
+    db.collection('commission_payments').document(payment_id).update({"status": "confirmed"})
+    db.collection('commissions').document(payment["commission_id"]).update({
+        "status": CommissionStatus.PAID.value,
+        "paid_at": datetime.now(timezone.utc).isoformat()
+    })
+
     return {"message": "Commission payment confirmed"}
 
 # ======================== ADMIN ROUTES ========================
@@ -1072,28 +1349,32 @@ async def confirm_commission_payment(payment_id: str, user: dict = Depends(get_c
 async def get_all_users(user: dict = Depends(get_current_user)):
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+
+    users = [doc.to_dict() for doc in db.collection('users').stream()]
+    # Remove password from response
+    for u in users:
+        if 'password' in u:
+            del u['password']
     return users
 
 @api_router.get("/admin/stats")
 async def get_stats(user: dict = Depends(get_current_user)):
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    total_users = await db.users.count_documents({})
-    total_products = await db.products.count_documents({})
-    total_orders = await db.orders.count_documents({})
-    pending_payments = await db.payments.count_documents({"status": "pending_review"})
-    pending_commissions = await db.commission_payments.count_documents({"status": "pending_review"})
-    
-    completed_orders = await db.orders.find({"payment_status": PaymentStatus.COMPLETED.value}, {"_id": 0}).to_list(10000)
+
+    total_users = len(list(db.collection('users').stream()))
+    total_products = len(list(db.collection('products').stream()))
+    total_orders = len(list(db.collection('orders').stream()))
+    pending_payments = len(list(db.collection('payments').where('status', '==', 'pending_review').stream()))
+    pending_commissions = len(list(db.collection('commission_payments').where('status', '==', 'pending_review').stream()))
+
+    completed_orders = [doc.to_dict() for doc in db.collection('orders').where('payment_status', '==', PaymentStatus.COMPLETED.value).stream()]
     total_sales = sum(o["total_amount"] for o in completed_orders)
-    
-    commissions = await db.commissions.find({}, {"_id": 0}).to_list(10000)
+
+    commissions = [doc.to_dict() for doc in db.collection('commissions').stream()]
     total_commission_earned = sum(c["commission_amount"] for c in commissions if c["status"] == CommissionStatus.PAID.value)
     pending_commission_amount = sum(c["commission_amount"] for c in commissions if c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value, CommissionStatus.PENDING_VERIFICATION.value])
-    
+
     return {
         "total_users": total_users,
         "total_products": total_products,
@@ -1110,40 +1391,43 @@ async def get_admin_commission_payment_method(user: dict = Depends(get_current_u
     """Get admin's preferred payment method for commission collection"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    setting = await db.settings.find_one({"key": "commission_payment_method"}, {"_id": 0})
-    return setting or {"payment_method_id": None}
+
+    setting_doc = db.collection('settings').document('commission_payment_method').get()
+    if setting_doc.exists:
+        return setting_doc.to_dict()
+    return {"payment_method_id": None}
 
 @api_router.post("/admin/commission-payment-method")
 async def set_admin_commission_payment_method(data: dict, user: dict = Depends(get_current_user)):
     """Admin sets preferred payment method for commission collection"""
     if user["role"] != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    await db.settings.update_one(
-        {"key": "commission_payment_method"},
-        {"$set": {
-            "key": "commission_payment_method",
-            "payment_method_id": data.get("payment_method_id"),
-            "account_name": data.get("account_name"),
-            "account_number": data.get("account_number"),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }},
-        upsert=True
-    )
+
+    db.collection('settings').document('commission_payment_method').set({
+        "key": "commission_payment_method",
+        "payment_method_id": data.get("payment_method_id"),
+        "account_name": data.get("account_name"),
+        "account_number": data.get("account_number"),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    })
     return {"message": "Commission payment method updated"}
 
 @api_router.get("/admin/commission-payment-info")
 async def get_commission_payment_info():
     """Public endpoint for sellers to see where to pay commission"""
-    setting = await db.settings.find_one({"key": "commission_payment_method"}, {"_id": 0})
-    if not setting or not setting.get("payment_method_id"):
+    setting_doc = db.collection('settings').document('commission_payment_method').get()
+    if not setting_doc.exists:
         return {"message": "Commission payment method not set"}
-    
-    method = await db.payment_methods.find_one({"id": setting["payment_method_id"]}, {"_id": 0})
-    if not method:
+    setting = setting_doc.to_dict()
+
+    if not setting.get("payment_method_id"):
+        return {"message": "Commission payment method not set"}
+
+    method_doc = db.collection('payment_methods').document(setting["payment_method_id"]).get()
+    if not method_doc.exists:
         return {"message": "Payment method not found"}
-    
+    method = method_doc.to_dict()
+
     return {
         "method_name": method["name"],
         "method_type": method["type"],
@@ -1158,20 +1442,44 @@ async def get_commission_payment_info():
 async def get_seller_stats(user: dict = Depends(get_current_user)):
     if user["role"] not in [UserRole.SELLER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Sellers only")
-    
-    total_products = await db.products.count_documents({"seller_id": user["id"]})
-    orders = await db.orders.find({"items.seller_id": user["id"]}, {"_id": 0}).to_list(10000)
-    
+
+    # Get product count efficiently
+    total_products = len(list(db.collection('products').where('seller_id', '==', user["id"]).stream()))
+
+    # Get seller's completed orders using batched queries for efficiency
+    orders = []
+    last_doc = None
+    batch_size = 50
+
+    while len(orders) < 200:  # Reasonable limit
+        query = db.collection('orders').where('payment_status', '==', PaymentStatus.COMPLETED.value).order_by('created_at', direction=firestore.Query.DESCENDING).limit(batch_size)
+        if last_doc:
+            query = query.start_after(last_doc)
+
+        batch = [doc.to_dict() for doc in query.stream()]
+        if not batch:
+            break
+
+        # Filter orders that contain seller's items
+        seller_orders = [o for o in batch if any(item.get('seller_id') == user["id"] for item in o.get('items', []))]
+        orders.extend(seller_orders)
+
+        if len(batch) < batch_size:
+            break
+
+        last_doc = batch[-1]['created_at']
+
     total_orders = len(orders)
     total_sales = sum(
         sum(item["total"] for item in o["items"] if item["seller_id"] == user["id"])
-        for o in orders if o["payment_status"] == PaymentStatus.COMPLETED.value
+        for o in orders
     )
-    
-    commissions = await db.commissions.find({"seller_id": user["id"]}, {"_id": 0}).to_list(10000)
-    pending_commission = sum(c["commission_amount"] for c in commissions if c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value])
+
+    # Get commission stats efficiently
+    commissions = [doc.to_dict() for doc in db.collection('commissions').where('seller_id', '==', user["id"]).stream()]
+    pending_commission = sum(c["commission_amount"] for c in commissions if c["status"] in [CommissionStatus.PENDING.value, CommissionStatus.OVERDUE.value, CommissionStatus.PENDING_VERIFICATION.value])
     paid_commission = sum(c["commission_amount"] for c in commissions if c["status"] == CommissionStatus.PAID.value)
-    
+
     return {
         "total_products": total_products,
         "total_orders": total_orders,
@@ -1183,10 +1491,11 @@ async def get_seller_stats(user: dict = Depends(get_current_user)):
 # ======================== SEED DATA ========================
 @api_router.post("/seed")
 async def seed_data():
-    existing_categories = await db.categories.count_documents({})
-    if existing_categories > 0:
+    # Check if already seeded
+    categories_ref = db.collection('categories')
+    if len(list(categories_ref.stream())) > 0:
         return {"message": "Already seeded"}
-    
+
     # Create payment methods (Top 10 Ethiopian payment methods)
     payment_methods = [
         {"id": str(uuid.uuid4()), "name": "Telebirr", "type": "mobile_money", "account_name": "Etho Parts", "account_number": "0777770757", "instructions": "Send money to the account number and upload receipt", "logo_url": "https://play-lh.googleusercontent.com/Wd2GI4hYd_4TdNjqTFVW0xqEUY5PmKv5YfPx2CpFo7vAQwRxuLcZGQ1EIQ7v7xVBcg=w240-h480-rw", "enabled": True},
@@ -1200,24 +1509,20 @@ async def seed_data():
         {"id": str(uuid.uuid4()), "name": "Bank of Abyssinia", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "98765432101234", "instructions": "Transfer to BOA account", "logo_url": "https://www.bankofabyssinia.com/wp-content/uploads/2020/01/boa-logo.png", "enabled": True},
         {"id": str(uuid.uuid4()), "name": "Wegagen Bank", "type": "bank", "account_name": "Etho Parts PLC", "account_number": "0567891234567", "instructions": "Transfer to Wegagen Bank account", "logo_url": "https://wegagenbanksc.com/wp-content/uploads/2020/01/wegagen-logo.png", "enabled": True},
     ]
-    
+
     for pm in payment_methods:
         pm["created_at"] = datetime.now(timezone.utc).isoformat()
-    await db.payment_methods.insert_many(payment_methods)
-    
+        db.collection('payment_methods').document(pm["id"]).set(pm)
+
     # Set default admin commission payment method (Telebirr)
-    await db.settings.update_one(
-        {"key": "commission_payment_method"},
-        {"$set": {
-            "key": "commission_payment_method",
-            "payment_method_id": payment_methods[0]["id"],
-            "account_name": "Etho Parts Admin",
-            "account_number": "0777770757",
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }},
-        upsert=True
-    )
-    
+    db.collection('settings').document('commission_payment_method').set({
+        "key": "commission_payment_method",
+        "payment_method_id": payment_methods[0]["id"],
+        "account_name": "Etho Parts Admin",
+        "account_number": "0777770757",
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    })
+
     # Create categories
     categories = [
         {"id": str(uuid.uuid4()), "name": "Engine Parts", "description": "Engine components and accessories", "icon": "engine"},
@@ -1229,8 +1534,10 @@ async def seed_data():
         {"id": str(uuid.uuid4()), "name": "Lighting", "description": "Headlights, taillights, bulbs", "icon": "light"},
         {"id": str(uuid.uuid4()), "name": "Tires & Wheels", "description": "Tires, rims, and accessories", "icon": "tire"},
     ]
-    await db.categories.insert_many(categories)
-    
+
+    for cat in categories:
+        db.collection('categories').document(cat["id"]).set(cat)
+
     # Create admin user
     admin_user = {
         "id": str(uuid.uuid4()),
@@ -1244,8 +1551,8 @@ async def seed_data():
         "enabled_payment_methods": [],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.users.insert_one(admin_user)
-    
+    db.collection('users').document(admin_user["id"]).set(admin_user)
+
     # Create sample seller with payment methods
     seller_user = {
         "id": str(uuid.uuid4()),
@@ -1259,8 +1566,8 @@ async def seed_data():
         "enabled_payment_methods": [payment_methods[0]["id"], payment_methods[5]["id"]],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.users.insert_one(seller_user)
-    
+    db.collection('users').document(seller_user["id"]).set(seller_user)
+
     # Add seller payment methods
     seller_payment_methods = [
         {
@@ -1282,33 +1589,34 @@ async def seed_data():
             "created_at": datetime.now(timezone.utc).isoformat()
         }
     ]
-    await db.seller_payment_methods.insert_many(seller_payment_methods)
-    
+
+    for spm in seller_payment_methods:
+        db.collection('seller_payment_methods').document(spm["id"]).set(spm)
+
     # Create sample products
     sample_products = [
-        {"name": "Toyota Corolla Brake Pads", "description": "High-quality ceramic brake pads for Toyota Corolla 2015-2023.", "price": 2500, "category_id": categories[1]["id"], "brand": "Bosch", "condition": "new", "stock": 25, "images": ["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400"], "compatible_cars": ["Toyota Corolla", "Toyota Camry"], "seller_id": seller_user["id"]},
-        {"name": "Nissan Sunny Air Filter", "description": "OEM quality air filter for Nissan Sunny.", "price": 450, "category_id": categories[5]["id"], "brand": "Mann", "condition": "new", "stock": 50, "images": ["https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400"], "compatible_cars": ["Nissan Sunny", "Nissan Almera"], "seller_id": seller_user["id"]},
-        {"name": "Universal LED Headlight Bulbs", "description": "6000K bright white LED headlight bulbs.", "price": 1200, "category_id": categories[6]["id"], "brand": "Philips", "condition": "new", "stock": 100, "images": ["https://images.unsplash.com/photo-1489824904134-891ab64532f1?w=400"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
-        {"name": "Suzuki Swift Alternator", "description": "Remanufactured alternator for Suzuki Swift 2010-2020.", "price": 8500, "category_id": categories[3]["id"], "brand": "Denso", "condition": "refurbished", "stock": 8, "images": ["https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400"], "compatible_cars": ["Suzuki Swift", "Suzuki Dzire"], "seller_id": seller_user["id"]},
-        {"name": "Hyundai Accent Shock Absorbers", "description": "Front shock absorbers set for Hyundai Accent.", "price": 4200, "category_id": categories[2]["id"], "brand": "KYB", "condition": "new", "stock": 15, "images": ["https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400"], "compatible_cars": ["Hyundai Accent", "Hyundai Verna"], "seller_id": seller_user["id"]},
-        {"name": "Toyota Hilux Oil Filter", "description": "Genuine oil filter for Toyota Hilux diesel engines.", "price": 350, "category_id": categories[5]["id"], "brand": "Toyota", "condition": "new", "stock": 75, "images": ["https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=400"], "compatible_cars": ["Toyota Hilux", "Toyota Fortuner"], "seller_id": seller_user["id"]},
-        {"name": "Side Mirror (Left) - Universal", "description": "Universal fit left side mirror.", "price": 650, "category_id": categories[4]["id"], "brand": "Generic", "condition": "new", "stock": 30, "images": ["https://images.unsplash.com/photo-1489824904134-891ab64532f1?w=400"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
-        {"name": "Car Battery 12V 60Ah", "description": "Maintenance-free car battery.", "price": 5500, "category_id": categories[3]["id"], "brand": "Exide", "condition": "new", "stock": 20, "images": ["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
-        {"name": "Timing Belt Kit - Toyota", "description": "Complete timing belt kit for Toyota 1.6L-2.0L engines.", "price": 3800, "category_id": categories[0]["id"], "brand": "Gates", "condition": "new", "stock": 12, "images": ["https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400"], "compatible_cars": ["Toyota Corolla", "Toyota Yaris"], "seller_id": seller_user["id"]},
-        {"name": "Isuzu D-Max Clutch Kit", "description": "Complete clutch kit for Isuzu D-Max.", "price": 7200, "category_id": categories[0]["id"], "brand": "Valeo", "condition": "new", "stock": 6, "images": ["https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400"], "compatible_cars": ["Isuzu D-Max", "Isuzu MU-X"], "seller_id": seller_user["id"]},
-        {"name": "Spark Plugs Set (4pcs)", "description": "Iridium spark plugs for better ignition.", "price": 1600, "category_id": categories[0]["id"], "brand": "NGK", "condition": "new", "stock": 40, "images": ["https://images.unsplash.com/photo-1489824904134-891ab64532f1?w=400"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
-        {"name": "Radiator - Honda Civic", "description": "Aluminum radiator for Honda Civic 2006-2011.", "price": 4500, "category_id": categories[0]["id"], "brand": "Denso", "condition": "new", "stock": 10, "images": ["https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400"], "compatible_cars": ["Honda Civic", "Honda City"], "seller_id": seller_user["id"]},
+        {"name": "Toyota Corolla Brake Pads", "description": "High-quality ceramic brake pads for Toyota Corolla 2015-2023.", "price": 2500, "category_id": categories[1]["id"], "brand": "Bosch", "condition": "new", "stock": 25, "images": ["https://picsum.photos/400/300?random=1"], "compatible_cars": ["Toyota Corolla", "Toyota Camry"], "seller_id": seller_user["id"]},
+        {"name": "Nissan Sunny Air Filter", "description": "OEM quality air filter for Nissan Sunny.", "price": 450, "category_id": categories[5]["id"], "brand": "Mann", "condition": "new", "stock": 50, "images": ["https://picsum.photos/400/300?random=2"], "compatible_cars": ["Nissan Sunny", "Nissan Almera"], "seller_id": seller_user["id"]},
+        {"name": "Universal LED Headlight Bulbs", "description": "6000K bright white LED headlight bulbs.", "price": 1200, "category_id": categories[6]["id"], "brand": "Philips", "condition": "new", "stock": 100, "images": ["https://picsum.photos/400/300?random=3"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
+        {"name": "Suzuki Swift Alternator", "description": "Remanufactured alternator for Suzuki Swift 2010-2020.", "price": 8500, "category_id": categories[3]["id"], "brand": "Denso", "condition": "refurbished", "stock": 8, "images": ["https://picsum.photos/400/300?random=4"], "compatible_cars": ["Suzuki Swift", "Suzuki Dzire"], "seller_id": seller_user["id"]},
+        {"name": "Hyundai Accent Shock Absorbers", "description": "Front shock absorbers set for Hyundai Accent.", "price": 4200, "category_id": categories[2]["id"], "brand": "KYB", "condition": "new", "stock": 15, "images": ["https://picsum.photos/400/300?random=5"], "compatible_cars": ["Hyundai Accent", "Hyundai Verna"], "seller_id": seller_user["id"]},
+        {"name": "Toyota Hilux Oil Filter", "description": "Genuine oil filter for Toyota Hilux diesel engines.", "price": 350, "category_id": categories[5]["id"], "brand": "Toyota", "condition": "new", "stock": 75, "images": ["https://picsum.photos/400/300?random=6"], "compatible_cars": ["Toyota Hilux", "Toyota Fortuner"], "seller_id": seller_user["id"]},
+        {"name": "Side Mirror (Left) - Universal", "description": "Universal fit left side mirror.", "price": 650, "category_id": categories[4]["id"], "brand": "Generic", "condition": "new", "stock": 30, "images": ["https://picsum.photos/400/300?random=7"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
+        {"name": "Car Battery 12V 60Ah", "description": "Maintenance-free car battery.", "price": 5500, "category_id": categories[3]["id"], "brand": "Exide", "condition": "new", "stock": 20, "images": ["https://picsum.photos/400/300?random=8"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
+        {"name": "Timing Belt Kit - Toyota", "description": "Complete timing belt kit for Toyota 1.6L-2.0L engines.", "price": 3800, "category_id": categories[0]["id"], "brand": "Gates", "condition": "new", "stock": 12, "images": ["https://picsum.photos/400/300?random=9"], "compatible_cars": ["Toyota Corolla", "Toyota Yaris"], "seller_id": seller_user["id"]},
+        {"name": "Isuzu D-Max Clutch Kit", "description": "Complete clutch kit for Isuzu D-Max.", "price": 7200, "category_id": categories[0]["id"], "brand": "Valeo", "condition": "new", "stock": 6, "images": ["https://picsum.photos/400/300?random=10"], "compatible_cars": ["Isuzu D-Max", "Isuzu MU-X"], "seller_id": seller_user["id"]},
+        {"name": "Spark Plugs Set (4pcs)", "description": "Iridium spark plugs for better ignition.", "price": 1600, "category_id": categories[0]["id"], "brand": "NGK", "condition": "new", "stock": 40, "images": ["https://picsum.photos/400/300?random=11"], "compatible_cars": ["Universal"], "seller_id": seller_user["id"]},
+        {"name": "Radiator - Honda Civic", "description": "Aluminum radiator for Honda Civic 2006-2011.", "price": 4500, "category_id": categories[0]["id"], "brand": "Denso", "condition": "new", "stock": 10, "images": ["https://picsum.photos/400/300?random=12"], "compatible_cars": ["Honda Civic", "Honda City"], "seller_id": seller_user["id"]},
     ]
-    
+
     for product in sample_products:
         product["id"] = str(uuid.uuid4())
         product["avg_rating"] = round(3.5 + (hash(product["name"]) % 15) / 10, 1)
         product["review_count"] = hash(product["name"]) % 20
         product["created_at"] = datetime.now(timezone.utc).isoformat()
         product["specifications"] = None
-    
-    await db.products.insert_many(sample_products)
-    
+        db.collection('products').document(product["id"]).set(product)
+
     return {"message": "Data seeded successfully", "categories": len(categories), "products": len(sample_products), "payment_methods": len(payment_methods)}
 
 @api_router.get("/")
@@ -1317,14 +1625,16 @@ async def root():
 
 app.include_router(api_router)
 
+# CORS configuration from environment
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000')
+allow_origins = [origin.strip() for origin in cors_origins.split(',')]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+
