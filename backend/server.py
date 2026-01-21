@@ -1,3 +1,4 @@
+# Etho Parts Backend API - Fixed Firebase credentials parsing
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
