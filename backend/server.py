@@ -703,18 +703,18 @@ async def get_products(
 
 @api_router.get("/products/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: str):
-    product_doc = db.collection('products').document(product_id).get()
-    if not product_doc.exists:
+    product_docs = db.table('products').select('*').eq('id', product_id).limit(1).execute()
+    if len(product_docs.data) == 0:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    product = product_doc.to_dict()
+    product = product_docs.data[0]
 
-    category_doc = db.collection('categories').document(product["category_id"]).get()
-    if category_doc.exists:
-        product["category_name"] = category_doc.to_dict()["name"]
-    seller_doc = db.collection('users').document(product["seller_id"]).get()
-    if seller_doc.exists:
-        seller_data = seller_doc.to_dict()
+    category_doc = db.table('categories').select('name').eq('id', product["category_id"]).limit(1).execute()
+    if len(category_doc.data) > 0:
+        product["category_name"] = category_doc.data[0]["name"]
+    seller_doc = db.table('users').select('business_name', 'name').eq('id', product["seller_id"]).limit(1).execute()
+    if len(seller_doc.data) > 0:
+        seller_data = seller_doc.data[0]
         product["seller_name"] = seller_data.get("business_name") or seller_data["name"]
 
     return product
