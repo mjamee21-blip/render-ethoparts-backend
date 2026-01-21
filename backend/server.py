@@ -167,7 +167,6 @@ security = HTTPBearer()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("Starting Etho Parts API server")
 
 # ======================== ENUMS ========================
 class UserRole(str, Enum):
